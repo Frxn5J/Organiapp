@@ -12,57 +12,76 @@ const CATEGORIAS_DEFAULT = [
   { id: 8, nombre: 'Deudas', icono: '💳', colorSecundario: '#6366f1' }
 ]
 
-const COLORES_PREDEFINIDOS = [
-  { nombre: 'Verde', valor: '#10b981' },
-  { nombre: 'Azul', valor: '#3b82f6' },
-  { nombre: 'Morado', valor: '#8b5cf6' },
-  { nombre: 'Rosa', valor: '#ec4899' },
-  { nombre: 'Naranja', valor: '#f97316' },
-  { nombre: 'Cian', valor: '#06b6d4' },
-  { nombre: 'Índigo', valor: '#6366f1' }
-]
-
 const FRECUENCIAS = {
   semanal: { valor: 1, label: 'Semanal', divisor: 4.33 },
   quincenal: { valor: 2, label: 'Quincenal', divisor: 2.17 },
   mensual: { valor: 3, label: 'Mensual', divisor: 1 }
 }
 
-// Función para generar variantes de un color
-const generarVariantesColor = (colorHex) => {
-  // Conversión simple - en producción usar una librería como chroma.js
-  return {
-    primary: colorHex,
-    light: ajustarBrillo(colorHex, 20),
-    dark: ajustarBrillo(colorHex, -20),
-    lighter: ajustarBrillo(colorHex, 40)
-  }
-}
+// Iconos SVG
+const IconoSobre = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+    <polyline points="22,6 12,13 2,6"/>
+  </svg>
+)
 
-const ajustarBrillo = (hex, percent) => {
-  const num = parseInt(hex.replace('#', ''), 16)
-  const amt = Math.round(2.55 * percent)
-  const R = (num >> 16) + amt
-  const G = (num >> 8 & 0x00FF) + amt
-  const B = (num & 0x0000FF) + amt
-  return '#' + (0x1000000 + 
-    (R < 255 ? (R < 1 ? 0 : R) : 255) * 0x10000 + 
-    (G < 255 ? (G < 1 ? 0 : G) : 255) * 0x100 + 
-    (B < 255 ? (B < 1 ? 0 : B) : 255)
-  ).toString(16).slice(1)
-}
+const IconoInicio = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+    <polyline points="9 22 9 12 15 12 15 22"/>
+  </svg>
+)
+
+const IconoSobres = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+  </svg>
+)
+
+const IconoMovimientos = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+    <polyline points="14 2 14 8 20 8"/>
+    <line x1="16" y1="13" x2="8" y2="13"/>
+    <line x1="16" y1="17" x2="8" y2="17"/>
+    <polyline points="10 9 9 9 8 9"/>
+  </svg>
+)
+
+const IconoPerfil = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+    <circle cx="12" cy="7" r="4"/>
+  </svg>
+)
+
+const IconoWallet = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/>
+    <path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/>
+    <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"/>
+  </svg>
+)
+
+const IconoChart = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/>
+    <line x1="12" y1="20" x2="12" y2="4"/>
+    <line x1="6" y1="20" x2="6" y2="14"/>
+  </svg>
+)
 
 function App() {
-  // Estado para ingresos y frecuencia
   const [ingreso, setIngreso] = useState(() => {
     const guardado = localStorage.getItem('ingreso')
-    return guardado ? parseFloat(guardado) : 0
+    return guardado ? parseFloat(guardado) : 15000
   })
   const [frecuencia, setFrecuencia] = useState(() => {
     return localStorage.getItem('frecuencia') || 'mensual'
   })
   
-  // Estado para categorías y sobres
   const [categorias, setCategorias] = useState(() => {
     const guardado = localStorage.getItem('categorias')
     return guardado ? JSON.parse(guardado) : CATEGORIAS_DEFAULT.map(cat => ({
@@ -73,86 +92,36 @@ function App() {
     }))
   })
   
-  // Estado para vista activa
   const [vistaActiva, setVistaActiva] = useState('inicio')
-  
-  // Estado para color personalizado
-  const [colorPersonalizado, setColorPersonalizado] = useState(() => {
-    return localStorage.getItem('colorApp') || '#10b981'
-  })
-  
-  // Estado para movimiento nuevo
-  const [nuevoMovimiento, setNuevoMovimiento] = useState({
-    tipo: 'gasto',
-    monto: '',
-    categoria: '',
-    fecha: new Date().toISOString().split('T')[0],
-    metodoPago: 'efectivo',
-    nota: ''
-  })
-  
-  // Actualizar variables CSS cuando cambia el color
-  useEffect(() => {
-    const root = document.documentElement
-    const variantes = generarVariantesColor(colorPersonalizado)
-    
-    root.style.setProperty('--color-primary', variantes.primary)
-    root.style.setProperty('--color-primary-light', variantes.light)
-    root.style.setProperty('--color-primary-dark', variantes.dark)
-    root.style.setProperty('--color-primary-lighter', variantes.lighter)
-    root.style.setProperty('--color-primary-gradient', `linear-gradient(135deg, ${variantes.primary} 0%, ${variantes.dark} 100%)`)
-    
-    localStorage.setItem('colorApp', colorPersonalizado)
-  }, [colorPersonalizado])
-  
-  // Guardar en localStorage cuando cambien las categorías
+  const [drawerAbierto, setDrawerAbierto] = useState(false)
+  const [sobreSeleccionado, setSobreSeleccionado] = useState(null)
+
   useEffect(() => {
     localStorage.setItem('categorias', JSON.stringify(categorias))
   }, [categorias])
   
-  // Guardar ingreso y frecuencia
   useEffect(() => {
     localStorage.setItem('ingreso', ingreso.toString())
     localStorage.setItem('frecuencia', frecuencia)
   }, [ingreso, frecuencia])
   
-  // Calcular aportación sugerida basada en frecuencia de ingreso
-  const calcularAportacion = (gastoMaximo, freq) => {
-    const frecuenciaData = FRECUENCIAS[freq]
-    if (!frecuenciaData || gastoMaximo <= 0) return 0
-    return Math.round((gastoMaximo / frecuenciaData.divisor) * 100) / 100
-  }
-  
-  // Total de gastos máximos
   const totalGastosMaximos = categorias.reduce((sum, cat) => sum + cat.gastoMaximo, 0)
-  
-  // Total asignado actualmente
   const totalAsignado = categorias.reduce((sum, cat) => sum + cat.asignadoActual, 0)
-  
-  // Total gastado
   const totalGastado = categorias.reduce((sum, cat) => sum + cat.gastadoAcumulado, 0)
-  
-  // Saldo disponible
   const saldoDisponible = ingreso - totalAsignado
   
-  // Progreso del presupuesto mensual
-  const progresoPresupuesto = ingreso > 0 ? Math.min((totalGastado / ingreso) * 100, 100) : 0
-  
-  // Actualizar gasto máximo de una categoría
   const actualizarGastoMaximo = (id, valor) => {
     setCategorias(prev => prev.map(cat => 
       cat.id === id ? { ...cat, gastoMaximo: parseFloat(valor) || 0 } : cat
     ))
   }
   
-  // Asignar dinero a un sobre
   const asignarDinero = (id, cantidad) => {
     setCategorias(prev => prev.map(cat =>
       cat.id === id ? { ...cat, asignadoActual: cat.asignadoActual + parseFloat(cantidad) } : cat
     ))
   }
   
-  // Registrar gasto
   const registrarGasto = (id, cantidad) => {
     setCategorias(prev => prev.map(cat =>
       cat.id === id && cat.asignadoActual >= cantidad
@@ -165,93 +134,557 @@ function App() {
     ))
   }
   
-  // Guardar movimiento
-  const guardarMovimiento = () => {
-    if (!nuevoMovimiento.monto || !nuevoMovimiento.categoria) {
-      alert('Por favor completa el monto y la categoría')
-      return
-    }
-    
-    const categoriaId = parseInt(nuevoMovimiento.categoria)
-    const monto = parseFloat(nuevoMovimiento.monto)
-    
-    if (nuevoMovimiento.tipo === 'gasto') {
-      registrarGasto(categoriaId, monto)
-    } else {
-      asignarDinero(categoriaId, monto)
-    }
-    
-    // Resetear formulario
-    setNuevoMovimiento({
-      tipo: 'gasto',
-      monto: '',
-      categoria: '',
-      fecha: new Date().toISOString().split('T')[0],
-      metodoPago: 'efectivo',
-      nota: ''
-    })
-    
-    alert('Movimiento guardado exitosamente')
+  const abrirDrawer = (sobre) => {
+    setSobreSeleccionado(sobre)
+    setDrawerAbierto(true)
   }
   
-  // Resetear datos
-  const resetearDatos = () => {
-    if (confirm('¿Estás seguro de que quieres borrar todos los datos?')) {
-      localStorage.removeItem('categorias')
-      setCategorias(CATEGORIAS_DEFAULT.map(cat => ({
-        ...cat,
-        gastoMaximo: 0,
-        asignadoActual: 0,
-        gastadoAcumulado: 0
-      })))
-      setIngreso(0)
-    }
+  const cerrarDrawer = () => {
+    setDrawerAbierto(false)
+    setTimeout(() => setSobreSeleccionado(null), 200)
   }
   
-  // Formatear moneda
   const formatoMoneda = (valor) => {
     return new Intl.NumberFormat('es-MX', {
       style: 'currency',
-      currency: 'MXN'
+      currency: 'MXN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(valor)
   }
   
   return (
-    <div className="app">
-      <header className="header">
-        <h1>💰 Organigastos</h1>
-        <p className="subtitle">Controla tus finanzas con estilo</p>
-      </header>
+    <div className="shell">
+      {/* Contenido principal */}
+      <div className="content">
+        {/* Brandbar */}
+        <div className="brandbar">
+          <div className="brand">
+            <div className="brand-dot">
+              <IconoSobre />
+            </div>
+            <span className="brand-name">Sobres</span>
+          </div>
+          <div className="sideFoot">
+            <span className="side-chip">Ingreso: <b>{formatoMoneda(ingreso)}</b></span>
+            <span className="pill"><i></i> {FRECUENCIAS[frecuencia]?.label}</span>
+          </div>
+        </div>
+        
+        {/* Topbar */}
+        <div className="topbar">
+          <div>
+            <div className="eyebrow">Resumen</div>
+            <h1>Tu dinero organizado</h1>
+            <p>Administra tu presupuesto por categorías y mantén el control de tus gastos.</p>
+          </div>
+          <div className="config-frecuencia">
+            <div className="seg">
+              {Object.entries(FRECUENCIAS).map(([key, data]) => (
+                <button
+                  key={key}
+                  className={frecuencia === key ? 'active' : ''}
+                  onClick={() => setFrecuencia(key)}
+                >
+                  {data.label}
+                </button>
+              ))}
+            </div>
+            <div className="rows">
+              <div className="field">
+                <label>Ingreso {FRECUENCIAS[frecuencia]?.label.toLowerCase()}</label>
+                <input
+                  type="number"
+                  value={ingreso || ''}
+                  onChange={(e) => setIngreso(parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Vista INICIO */}
+        {vistaActiva === 'inicio' && (
+          <>
+            {/* Summary Grid */}
+            <div className="sum-grid">
+              <div className="card sum-card hero">
+                <div className="sum-label">
+                  <IconoWallet />
+                  Disponible
+                </div>
+                <div className="sum-val mono">{formatoMoneda(saldoDisponible)}</div>
+                <div className="sum-sub">Para asignar a sobres</div>
+              </div>
+              
+              <div className="card sum-card">
+                <div className="sum-label">
+                  <IconoChart />
+                  Asignado
+                </div>
+                <div className="sum-val mono">{formatoMoneda(totalAsignado)}</div>
+                <div className="sum-sub">En {categorias.filter(c => c.asignadoActual > 0).length} sobres</div>
+              </div>
+              
+              <div className="card sum-card">
+                <div className="sum-label">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  Gastado
+                </div>
+                <div className="sum-val mono">{formatoMoneda(totalGastado)}</div>
+                <div className="sum-sub">Este periodo</div>
+              </div>
+            </div>
+            
+            {/* Banner informativo */}
+            {saldoDisponible > 0 && saldoDisponible < ingreso * 0.1 && (
+              <div className="banner banner-warn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <div>
+                  <strong>Casi sin margen</strong>
+                  Te queda poco sin asignar. Revisa tus sobres.
+                </div>
+              </div>
+            )}
+            
+            {saldoDisponible < 0 && (
+              <div className="banner banner-danger">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div>
+                  <strong>Presupuesto excedido</strong>
+                  Has asignado más de lo disponible. Ajusta tus sobres.
+                </div>
+              </div>
+            )}
+            
+            {/* Envelope Grid */}
+            <div style={{marginTop: '20px'}}>
+              <div className="eyebrow">Tus Sobres</div>
+              <div className="env-grid">
+                {categorias.map(cat => {
+                  const porcentaje = cat.gastoMaximo > 0 ? (cat.asignadoActual / cat.gastoMaximo) * 100 : 0
+                  return (
+                    <div 
+                      key={cat.id} 
+                      className="env"
+                      onClick={() => abrirDrawer(cat)}
+                      style={{cursor: 'pointer'}}
+                    >
+                      <div className="env-top">
+                        <div 
+                          className="env-ico"
+                          style={{background: cat.colorSecundario + '20', color: cat.colorSecundario}}
+                        >
+                          <span style={{fontSize: '20px'}}>{cat.icono}</span>
+                        </div>
+                        <div>
+                          <div className="env-name">{cat.nombre}</div>
+                          <div className="env-meta">
+                            {cat.gastoMaximo > 0 ? `${Math.round(porcentaje)}% completado` : 'Sin límite'}
+                          </div>
+                        </div>
+                        <div className="env-bal mono">{formatoMoneda(cat.asignadoActual)}</div>
+                      </div>
+                      
+                      {cat.gastoMaximo > 0 && (
+                        <div className="env-bar">
+                          <i style={{width: `${Math.min(porcentaje, 100)}%`, background: cat.colorSecundario}}></i>
+                        </div>
+                      )}
+                      
+                      <div className="env-foot">
+                        <span>Meta: <strong className="mono">{formatoMoneda(cat.gastoMaximo)}</strong></span>
+                        <span>Disponible: <strong className="mono">{formatoMoneda(cat.asignadoActual)}</strong></span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Vista SOBRES */}
+        {vistaActiva === 'sobres' && (
+          <>
+            <div className="eyebrow">Configuración</div>
+            <div className="tbl-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Categoría</th>
+                    <th class="num">Gasto Máximo</th>
+                    <th class="num">Asignado</th>
+                    <th class="num">Gastado</th>
+                    <th class="num">Disponible</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {categorias.map(cat => (
+                    <tr key={cat.id}>
+                      <td>
+                        <div className="cell-env">
+                          <i style={{background: cat.colorSecundario + '20', color: cat.colorSecundario}}>
+                            {cat.icono}
+                          </i>
+                          {cat.nombre}
+                        </div>
+                      </td>
+                      <td class="num">
+                        <input
+                          type="number"
+                          value={cat.gastoMaximo || ''}
+                          onChange={(e) => actualizarGastoMaximo(cat.id, e.target.value)}
+                          style={{
+                            border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '6px 10px',
+                            width: '100px',
+                            textAlign: 'right',
+                            fontFamily: 'var(--font-mono)'
+                          }}
+                          placeholder="0"
+                        />
+                      </td>
+                      <td class="num mono">{formatoMoneda(cat.asignadoActual)}</td>
+                      <td class="num mono">{formatoMoneda(cat.gastadoAcumulado)}</td>
+                      <td class="num mono" style={{color: cat.asignadoActual <= 0 ? 'var(--danger)' : 'var(--fg)'}}>
+                        {formatoMoneda(cat.asignadoActual)}
+                      </td>
+                      <td>
+                        <button 
+                          className="btn btn-soft btn-sm"
+                          onClick={() => abrirDrawer(cat)}
+                        >
+                          Ver
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  <tr class="total">
+                    <td>Total</td>
+                    <td class="num mono">{formatoMoneda(totalGastosMaximos)}</td>
+                    <td class="num mono">{formatoMoneda(totalAsignado)}</td>
+                    <td class="num mono">{formatoMoneda(totalGastado)}</td>
+                    <td class="num mono" style={{color: saldoDisponible < 0 ? 'var(--danger)' : 'var(--ok)'}}>
+                      {formatoMoneda(saldoDisponible)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+        
+        {/* Vista MOVIMIENTOS */}
+        {vistaActiva === 'movimientos' && (
+          <>
+            <div className="eyebrow">Registrar</div>
+            <div className="card">
+              <div className="card-t">Nuevo Movimiento</div>
+              <div className="card-s">Registra un gasto o abono a tus sobres</div>
+              
+              <div className="rows" style={{marginTop: '16px'}}>
+                <div className="field">
+                  <label>Tipo</label>
+                  <select 
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '11px 13px',
+                      fontSize: '15px',
+                      background: 'var(--surface)',
+                      minHeight: '44px',
+                      minWidth: '150px'
+                    }}
+                  >
+                    <option value="gasto">Registrar Gasto</option>
+                    <option value="abono">Abonar a Sobre</option>
+                  </select>
+                </div>
+                
+                <div className="field">
+                  <label>Monto</label>
+                  <input
+                    type="number"
+                    placeholder="0.00"
+                    style={{width: '150px'}}
+                  />
+                </div>
+                
+                <div className="field">
+                  <label>Categoría</label>
+                  <select
+                    style={{
+                      border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)',
+                      padding: '11px 13px',
+                      fontSize: '15px',
+                      background: 'var(--surface)',
+                      minHeight: '44px',
+                      minWidth: '200px'
+                    }}
+                  >
+                    <option value="">Selecciona...</option>
+                    {categorias.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.icono} {cat.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="field" style={{alignSelf: 'flex-end'}}>
+                  <button className="btn btn-primary">Guardar</button>
+                </div>
+              </div>
+            </div>
+            
+            <div style={{marginTop: '20px'}}>
+              <div className="eyebrow">Historial</div>
+              <div className="banner banner-ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                <div>
+                  <strong>Sin movimientos recientes</strong>
+                  Los movimientos que registres aparecerán aquí.
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* Vista PERFIL */}
+        {vistaActiva === 'perfil' && (
+          <>
+            <div className="eyebrow">Configuración</div>
+            <div className="card">
+              <div className="card-t">Preferencias</div>
+              <div className="card-s">Personaliza tu experiencia</div>
+              
+              <div className="rows" style={{marginTop: '16px'}}>
+                <div className="field">
+                  <label>Frecuencia de ingreso</label>
+                  <div className="seg">
+                    {Object.entries(FRECUENCIAS).map(([key, data]) => (
+                      <button
+                        key={key}
+                        className={frecuencia === key ? 'active' : ''}
+                        onClick={() => setFrecuencia(key)}
+                      >
+                        {data.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="field">
+                  <label>Ingreso {FRECUENCIAS[frecuencia]?.label.toLowerCase()}</label>
+                  <input
+                    type="number"
+                    value={ingreso || ''}
+                    onChange={(e) => setIngreso(parseFloat(e.target.value) || 0)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              
+              <div style={{marginTop: '20px', paddingTop: '20px', borderTop: '1px solid var(--border)'}}>
+                <button 
+                  className="btn btn-danger"
+                  onClick={() => {
+                    if (confirm('¿Estás seguro de borrar todos los datos?')) {
+                      localStorage.removeItem('categorias')
+                      localStorage.removeItem('ingreso')
+                      setCategorias(CATEGORIAS_DEFAULT.map(cat => ({
+                        ...cat,
+                        gastoMaximo: 0,
+                        asignadoActual: 0,
+                        gastadoAcumulado: 0
+                      })))
+                      setIngreso(0)
+                    }
+                  }}
+                >
+                  Borrar todos los datos
+                </button>
+              </div>
+            </div>
+            
+            <div style={{marginTop: '20px'}}>
+              <div className="eyebrow">Acerca de</div>
+              <div className="banner banner-ok">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                <div>
+                  <strong>Sobres v1.0</strong>
+                  Una app simple para organizar tu dinero en sobres virtuales.
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
       
-      {/* Navegación inferior estilo móvil */}
-      <nav className="nav">
-        <button 
-          className={vistaActiva === 'inicio' ? 'active' : ''}
-          onClick={() => setVistaActiva('inicio')}
-        >
-          🏠 Inicio
-        </button>
-        <button 
-          className={vistaActiva === 'sobres' ? 'active' : ''}
-          onClick={() => setVistaActiva('sobres')}
-        >
-          💼 Sobres
-        </button>
-        <button 
-          className={vistaActiva === 'movimientos' ? 'active' : ''}
-          onClick={() => setVistaActiva('movimientos')}
-        >
-          📝 Movimientos
-        </button>
-        <button 
-          className={vistaActiva === 'perfil' ? 'active' : ''}
-          onClick={() => setVistaActiva('perfil')}
-        >
-          👤 Perfil
-        </button>
-      </nav>
+      {/* Drawer lateral */}
+      <div className={`scrim ${drawerAbierto ? 'show' : ''}`} onClick={cerrarDrawer}></div>
+      <div className={`drawer ${drawerAbierto ? 'show' : ''}`}>
+        {sobreSeleccionado && (
+          <>
+            <div className="drawer-head">
+              <div 
+                className="env-ico"
+                style={{background: sobreSeleccionado.colorSecundario + '20', color: sobreSeleccionado.colorSecundario}}
+              >
+                <span style={{fontSize: '20px'}}>{sobreSeleccionado.icono}</span>
+              </div>
+              <div>
+                <h3>{sobreSeleccionado.nombre}</h3>
+                <div className="env-meta">Gestión del sobre</div>
+              </div>
+              <button className="drawer-close" onClick={cerrarDrawer}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="drawer-body">
+              <div className="d-stats">
+                <div className="d-stat">
+                  <label>Meta</label>
+                  <b className="mono">{formatoMoneda(sobreSeleccionado.gastoMaximo)}</b>
+                </div>
+                <div className="d-stat">
+                  <label>Asignado</label>
+                  <b className="mono">{formatoMoneda(sobreSeleccionado.asignadoActual)}</b>
+                </div>
+                <div className="d-stat">
+                  <label>Gastado</label>
+                  <b className="mono">{formatoMoneda(sobreSeleccionado.gastadoAcumulado)}</b>
+                </div>
+              </div>
+              
+              {sobreSeleccionado.gastoMaximo > 0 && (
+                <div>
+                  <div className="card-s" style={{marginBottom: '8px'}}>Progreso</div>
+                  <div className="env-bar" style={{height: '10px'}}>
+                    <i 
+                      style={{
+                        width: `${Math.min((sobreSeleccionado.asignadoActual / sobreSeleccionado.gastoMaximo) * 100, 100)}%`,
+                        background: sobreSeleccionado.colorSecundario
+                      }}
+                    ></i>
+                  </div>
+                </div>
+              )}
+              
+              <div className="d-actions">
+                <button 
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const monto = prompt('Monto a asignar:')
+                    if (monto && parseFloat(monto) > 0) {
+                      asignarDinero(sobreSeleccionado.id, monto)
+                      // Actualizar el sobre seleccionado con el nuevo valor
+                      setSobreSeleccionado(prev => ({
+                        ...prev,
+                        asignadoActual: prev.asignadoActual + parseFloat(monto)
+                      }))
+                    }
+                  }}
+                >
+                  + Asignar dinero
+                </button>
+                <button 
+                  className="btn btn-danger"
+                  onClick={() => {
+                    const monto = prompt('Monto del gasto:')
+                    if (monto && parseFloat(monto) > 0) {
+                      registrarGasto(sobreSeleccionado.id, monto)
+                      // Actualizar el sobre seleccionado con los nuevos valores
+                      setSobreSeleccionado(prev => ({
+                        ...prev,
+                        asignadoActual: prev.asignadoActual - parseFloat(monto),
+                        gastadoAcumulado: prev.gastadoAcumulado + parseFloat(monto)
+                      }))
+                    }
+                  }}
+                >
+                  Registrar gasto
+                </button>
+              </div>
+              
+              <div>
+                <div className="card-s" style={{marginBottom: '8px'}}>Configurar meta</div>
+                <div className="field">
+                  <label>Gasto máximo {FRECUENCIAS[frecuencia]?.label.toLowerCase()}</label>
+                  <input
+                    type="number"
+                    value={sobreSeleccionado.gastoMaximo || ''}
+                    onChange={(e) => {
+                      actualizarGastoMaximo(sobreSeleccionado.id, e.target.value)
+                      setSobreSeleccionado(prev => ({
+                        ...prev,
+                        gastoMaximo: parseFloat(e.target.value) || 0
+                      }))
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              
+              <div className="tx-list">
+                <div className="tx">
+                  <div className="tx-ico" style={{background: sobreSeleccionado.colorSecundario + '20'}}>
+                    {sobreSeleccionado.icono}
+                  </div>
+                  <div className="tx-info">
+                    <div className="tx-nombre">Último movimiento</div>
+                    <div className="tx-date">Reciente</div>
+                  </div>
+                  <div className="tx-amt mono">-</div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
       
-      <main className="main-content">
+      {/* Navegación inferior */}
+      <div className="sidebar">
+        <nav className="nav">
+          <button 
+            className={vistaActiva === 'inicio' ? 'active' : ''}
+            onClick={() => setVistaActiva('inicio')}
+          >
+            <IconoInicio />
+            Inicio
+          </button>
+          <button 
+            className={vistaActiva === 'sobres' ? 'active' : ''}
+            onClick={() => setVistaActiva('sobres')}
+          >
+            <IconoSobres />
+            Sobres
+          </button>
+          <button 
+            className={vistaActiva === 'movimientos' ? 'active' : ''}
+            onClick={() => setVistaActiva('movimientos')}
+          >
+            <IconoMovimientos />
+            Movimientos
+          </button>
+          <button 
+            className={vistaActiva === 'perfil' ? 'active' : ''}
+            onClick={() => setVistaActiva('perfil')}
+          >
+            <IconoPerfil />
+            Perfil
+          </button>
+        </nav>
+      </div>
+    </div>
         {/* VISTA DE INICIO */}
         {vistaActiva === 'inicio' && (
           <section className="inicio">
