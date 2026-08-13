@@ -427,7 +427,7 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
     <h3>Ingreso variable</h3>
     <div class="lead">Registra un ingreso extra de este mes (venta, extra, freelance...).</div>
     <div class="field"><label>Monto (€)</label><input type="number" id="varAmount" min="0" step="any" inputmode="decimal"></div>
-    <div class="field"><label>Concepto (opcional)</label><input type="text" id="varConcept" maxlength="40" placeholder="Ej. venta de coche"></div>
+    <div class="field"><label>Concepto (opcional)</label><input type="text" id="varConcept" maxlength="40"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeVarModal()">Cancelar</button>
       <button class="btn btn-primary" data-od-id="cta-variable-confirm" onclick="submitVar()">Guardar</button>
@@ -845,8 +845,8 @@ function renderDrawer(){
       '<div class="mini-form" id="miniForm">'+
         '<div class="card-t">'+formTitle+'</div>'+
         '<div class="row">'+
-          '<input type="number" id="miniAmt" min="1" step="any" placeholder="0" aria-label="Cantidad">'+
-          '<input type="text" id="miniNote" maxlength="40" placeholder="Nota (opcional)" aria-label="Nota">'+
+          '<input type="number" id="miniAmt" min="1" step="any" aria-label="Cantidad">'+
+          '<input type="text" id="miniNote" maxlength="40" aria-label="Nota">'+
         '</div>'+
         '<div id="miniMsg" class="form-err" hidden></div>'+
         '<button class="btn btn-primary btn-sm" id="miniSubmit" onclick="submitMini()">'+formBtn+'</button>'+
@@ -1096,7 +1096,7 @@ function obPrompt(step){
         '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub"><div class="tool"><button class="btn btn-primary" data-od-id="onb-start" onclick="obGo(1)">¡Empecemos!</button></div></div></div>';
     case 1:
       return obBot('Empezamos. <b>¿Cómo te llamas?</b>')+
-        '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub"><div class="fld"><input type="text" id="obName" maxlength="30" placeholder="Tu nombre" aria-label="Tu nombre"><button class="btn btn-primary" data-od-id="onb-name" onclick="obNameDone()">Siguiente</button></div></div></div>';
+        '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub"><div class="fld"><input type="text" id="obName" maxlength="30" aria-label="Tu nombre"><button class="btn btn-primary" data-od-id="onb-name" onclick="obNameDone()">Siguiente</button></div></div></div>';
     case 2:
       var seg='';
       ['mensual','quincenal','semanal'].forEach(function(k){
@@ -1105,7 +1105,7 @@ function obPrompt(step){
       return obBot('Perfecto. ¿Y cuánto recibes en <b>cada pago</b>?')+
         '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub">'+
           '<div class="radios">'+seg+'</div>'+
-          '<div class="fld" style="margin-top:12px"><input type="text" id="obIncome" inputmode="decimal" placeholder="Monto por pago (€)" aria-label="Ingreso por pago"><button class="btn btn-primary" data-od-id="onb-salary" onclick="obSalaryDone()">Listo</button></div>'+
+          '<div class="fld" style="margin-top:12px"><input type="text" id="obIncome" inputmode="decimal" aria-label="Ingreso por pago"><button class="btn btn-primary" data-od-id="onb-salary" onclick="obSalaryDone()">Listo</button></div>'+
           '<span class="memo">Ejemplo: si cobras 1800 € cada quincena, escribe 1800.</span>'+
         '</div></div>';
     case 3:
@@ -1117,7 +1117,7 @@ function obPrompt(step){
     case 4:
       return obBot('Ahora crea tus <b>categorías de gasto</b>. Ponle nombre, elige un icono y un color, y define cuánto máximo quieres gastar al mes.')+
         '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub"><div class="cat-form">'+
-          '<div class="cf-name"><input type="text" id="cfName" maxlength="24" placeholder="Nombre de la categoría (ej. Comida)" aria-label="Nombre de la categoría"></div>'+
+          '<div class="cf-name"><input type="text" id="cfName" maxlength="24" aria-label="Nombre de la categoría"></div>'+
           '<div class="cf-pick"><span class="pv" id="cfIconPv">'+icon(obPick.icon)+'</span><select id="cfIcon" onchange="obPickIcon(this.value)" aria-label="Icono">'+obIconOptions()+'</select></div>'+
           '<div class="cf-pick"><span class="pv sw" id="cfSwPv" style="--c:'+colorOf(obPick.color).a+'"></span><select id="cfColor" onchange="obPickSwat(this.value)" aria-label="Color">'+obColorOptions()+'</select></div>'+
           '<div class="cf-max"><label>Máximo al mes</label><input type="number" id="cfMax" min="0" step="any" value="200" inputmode="decimal"></div>'+

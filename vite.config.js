@@ -8,11 +8,12 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', '/public/icons.svg'],
+      includeAssets: ['favicon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'OrganiGastos - Sistema de Sobres Virtuales',
         short_name: 'OrganiGastos',
-        description: 'Administra tu dinero mediante categorías usando sobres virtuales',
+        description: 'Administra tu dinero mediante sobres virtuales. Funciona 100% sin internet.',
+        lang: 'es',
         theme_color: '#10b981',
         background_color: '#ffffff',
         display: 'standalone',
@@ -39,22 +40,11 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,json}'],
-        runtimeCaching: [{
-          urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-          handler: 'CacheFirst',
-          options: {
-            cacheName: 'google-fonts-cache',
-            expiration: {
-              maxEntries: 10,
-              maxAgeSeconds: 60 * 60 * 24 * 365
-            },
-            cacheableResponse: {
-              statuses: [0, 200]
-            }
-          }
-        }]
-      }
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        navigateFallback: 'index.html',
+        cleanupOutdatedCaches: true
+      },
+      devOptions: { enabled: false }
     })
   ],
 })
