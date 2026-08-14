@@ -123,6 +123,7 @@ export default function App(){
   const [catColor, setCatColor] = useState('teal')
   const [catMax, setCatMax] = useState('')
   const [varConcept, setVarConcept] = useState('')
+  const [confirmDel, setConfirmDel] = useState(null)
   const [obPick, setObPick] = useState({ icon:'comida', color:'teal' })
   const [obName, setObName] = useState('')
   const [obIncome, setObIncome] = useState('')
@@ -157,14 +158,15 @@ export default function App(){
   useEffect(()=>{
     function onEsc(e){
       if(e.key==='Escape'){
-        if(catModal) setCatModal(false)
+        if(confirmDel) setConfirmDel(null)
+        else if(catModal) setCatModal(false)
         else if(varModal) setVarModal(false)
         else if(drawerId) setDrawerId(null)
       }
     }
     document.addEventListener('keydown', onEsc)
     return ()=> document.removeEventListener('keydown', onEsc)
-  }, [varModal, drawerId, catModal])
+  }, [varModal, drawerId, catModal, confirmDel])
 
   function openCatModal(){
     setCatName(''); setCatIcon('comida'); setCatColor('teal'); setCatMax(''); setCatModal(true)
@@ -180,6 +182,22 @@ export default function App(){
     update(prev=> ({ ...prev, envelopes:[...prev.envelopes, { id, name, icon:catIcon, color:col.a, tint:col.soft, on:true, max:Math.round(n), balance:0, txns:[] }] }))
     closeCatModal()
     showToast('Categoría creada: '+name)
+  }
+  function deleteEnvelope(id){
+    const e = state.envelopes.find(x=>x.id===id)
+    if(!e) return
+    if(e.balance>0){ setConfirmDel(e); return }
+    update(prev=> ({ ...prev, envelopes: prev.envelopes.filter(x=>x.id!==id) }))
+    if(drawerId===id) setDrawerId(null)
+    showToast('Sobre eliminado: '+envName(e))
+  }
+  function confirmDelete(){
+    const e = confirmDel
+    if(!e) return
+    update(prev=> ({ ...prev, envelopes: prev.envelopes.filter(x=>x.id!==e.id) }))
+    if(drawerId===e.id) setDrawerId(null)
+    setConfirmDel(null)
+    showToast('Sobre eliminado: '+envName(e))
   }
 
   function showToast(msg){
@@ -459,8 +477,9 @@ export default function App(){
                 <div key={e.id} className="cat-item" data-od-id={`set-env-${e.id}`}>
                   <input type="checkbox" checked={!!e.on} onChange={()=> update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===e.id ? {...x, on:!x.on}:x)}))} aria-label={`Activar ${envName(e)}`} />
                   <span className="cat-ico" style={{"--c":ec.c,"--t":ec.t}}><Icon id={envIconId(e)} /></span>
-                  <div className="cat-info"><div className="cat-name">{envName(e)}</div><div className="cat-sub">Máximo mensual</div></div>
+                  <div className="cat-info"><div className="cat-name">{envName(e)}</div><div className="cat-sub">Máximo mensual · {e.balance>0?fmt(e.balance)+' disponible':''}</div></div>
                   <input type="number" min="0" step="any" value={e.max} onChange={ev=>{ const n=parseFloat(ev.target.value); update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===e.id ? {...x, max:(n>0&&isFinite(n))?Math.round(n):0}:x)})) }} aria-label={`Máximo mensual de ${envName(e)}`} />
+                  <button className="btn btn-ghost btn-sm" data-od-id={`del-env-${e.id}`} onClick={()=>deleteEnvelope(e.id)} aria-label={`Borrar ${envName(e)}`} title="Borrar sobre" style={{minHeight:36,padding:'0 10px',color:'var(--danger)',borderColor:'transparent'}}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M8 7l1 12h6l1-12"/><path d="M10 11v6M14 11v6"/></svg></button>
                 </div>
               )
             })}
@@ -505,6 +524,7 @@ export default function App(){
         <div className="drawer-head">
           <span className="env-ico" style={{"--c":ec.c,"--t":ec.t}}><Icon id={envIconId(e)} /></span>
           <h3>Sobre de {envName(e)}</h3>
+          <button className="btn btn-ghost btn-sm" data-od-id="drawer-delete" onClick={()=>deleteEnvelope(e.id)} style={{minHeight:32,padding:'6px 10px',color:'var(--danger)',borderColor:'transparent',marginLeft:6}}><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M8 7l1 12h6l1-12"/><path d="M10 11v6M14 11v6"/></svg>Borrar</button>
           <button className="drawer-close" data-od-id="drawer-close" onClick={()=>setDrawerId(null)} aria-label="Cerrar"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
         </div>
         <div className="drawer-body">
@@ -674,7 +694,7 @@ export default function App(){
     )
   }
 
-  const showScrim = !!drawerId || varModal || catModal
+  const showScrim = !!drawerId || varModal || catModal || !!confirmDel
 
   return (
     <div className="shell">
@@ -732,7 +752,20 @@ export default function App(){
         </nav>
       </aside>
 
-      <div className={`scrim${showScrim?' show':''}`} onClick={()=>{ if(catModal) closeCatModal(); else if(varModal) closeVarModal(); else setDrawerId(null) }} />
+      <div className={`scrim${showScrim?' show':''}`} onClick={()=>{ if(confirmDel) setConfirmDel(null); else if(catModal) closeCatModal(); else if(varModal) closeVarModal(); else setDrawerId(null) }} />
+
+      {confirmDel && (
+        <div className="modal" role="dialog" aria-modal="true" aria-label="Confirmar borrado">
+          <div className="modal-card">
+            <h3>¿Borrar {envName(confirmDel)}?</h3>
+            <div className="lead">Este sobre tiene <b>{fmt(confirmDel.balance)}</b> disponible y <b>{confirmDel.txns.length}</b> movimientos. Se perderá su historial.</div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={()=>setConfirmDel(null)}>Cancelar</button>
+              <button className="btn btn-danger" data-od-id="confirm-delete" onClick={confirmDelete}>Borrar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {catModal && (
         <div className="modal" role="dialog" aria-modal="true" aria-label="Nueva categoría">
