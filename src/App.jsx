@@ -117,11 +117,18 @@ export default function App(){
   const [toast, setToast] = useState('')
   const [varModal, setVarModal] = useState(false)
   const [varAmount, setVarAmount] = useState('')
+  const [catModal, setCatModal] = useState(false)
+  const [catName, setCatName] = useState('')
+  const [catIcon, setCatIcon] = useState('comida')
+  const [catColor, setCatColor] = useState('teal')
+  const [catMax, setCatMax] = useState('')
   const [varConcept, setVarConcept] = useState('')
   const [obPick, setObPick] = useState({ icon:'comida', color:'teal' })
   const [obName, setObName] = useState('')
   const [obIncome, setObIncome] = useState('')
   const [pop, setPop] = useState(false)
+  const [splash, setSplash] = useState(true)
+  const [splashOut, setSplashOut] = useState(false)
   const toastTimer = useRef(null)
   const chatBodyRef = useRef(null)
 
@@ -150,15 +157,39 @@ export default function App(){
   })
 
   useEffect(()=>{
+    const t1 = setTimeout(()=> setSplashOut(true), 1500)
+    const t2 = setTimeout(()=> setSplash(false), 1950)
+    return ()=>{ clearTimeout(t1); clearTimeout(t2) }
+  }, [])
+
+  useEffect(()=>{
     function onEsc(e){
       if(e.key==='Escape'){
-        if(varModal) setVarModal(false)
+        if(splash) return
+        if(catModal) setCatModal(false)
+        else if(varModal) setVarModal(false)
         else if(drawerId) setDrawerId(null)
       }
     }
     document.addEventListener('keydown', onEsc)
     return ()=> document.removeEventListener('keydown', onEsc)
-  }, [varModal, drawerId])
+  }, [varModal, drawerId, splash, catModal])
+
+  function openCatModal(){
+    setCatName(''); setCatIcon('comida'); setCatColor('teal'); setCatMax(''); setCatModal(true)
+  }
+  function closeCatModal(){ setCatModal(false) }
+  function submitCat(){
+    const name = catName.trim()
+    const n = parseFloat(catMax)
+    if(!name){ showToast('Escribe un nombre para la categoría'); return }
+    if(!(n>0) || !isFinite(n)){ showToast('Escribe un máximo válido'); return }
+    const col = colorOf(catColor)
+    const id = 'c'+Date.now()
+    update(prev=> ({ ...prev, envelopes:[...prev.envelopes, { id, name, icon:catIcon, color:col.a, tint:col.soft, on:true, max:Math.round(n), balance:0, txns:[] }] }))
+    closeCatModal()
+    showToast('Categoría creada: '+name)
+  }
 
   function showToast(msg){
     setToast(msg)
@@ -426,7 +457,10 @@ export default function App(){
           </div>
         </div>
         <div className="card" style={{marginBottom:16}} data-od-id="card-settings-envelopes">
-          <div className="card-t">Tus sobres</div><div className="card-s">Marca o desmarca sobres y ajusta el gasto máximo de cada mes.</div>
+          <div className="card-t" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}>Tus sobres
+            <button className="btn btn-primary btn-sm" data-od-id="add-category" onClick={openCatModal} style={{minHeight:36,padding:'8px 14px'}}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>Agregar categoría</button>
+          </div>
+          <div className="card-s">Marca o desmarca sobres y ajusta el gasto máximo de cada mes.</div>
           <div className="cat-list" style={{marginTop:16,gridTemplateColumns:'1fr'}}>
             {state.envelopes.map(e=>{
               const ec=envColor(e)
@@ -649,14 +683,14 @@ export default function App(){
     )
   }
 
-  const showScrim = !!drawerId || varModal
+  const showScrim = !!drawerId || varModal || catModal
 
   return (
     <div className="shell">
       <main className="content">
         <div className="brandbar">
           <div className="brand" data-od-id="brand-home" onClick={()=>go('dashboard')}>
-            <span className="brand-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><path d="M2 8.5l10 6 10-6"/></svg></span>
+            <span className="brand-dot"><img src="/pwa-192x192.png" alt="OrganiAPP" /></span>
             <span className="brand-name">OrganiAPP</span>
           </div>
           <div className="sideFoot" id="sideFoot">
@@ -707,7 +741,38 @@ export default function App(){
         </nav>
       </aside>
 
-      <div className={`scrim${showScrim?' show':''}`} onClick={()=>{ if(varModal) closeVarModal(); else setDrawerId(null) }} />
+      <div className={`scrim${showScrim?' show':''}`} onClick={()=>{ if(catModal) closeCatModal(); else if(varModal) closeVarModal(); else setDrawerId(null) }} />
+
+      {catModal && (
+        <div className="modal" role="dialog" aria-modal="true" aria-label="Nueva categoría">
+          <div className="modal-card">
+            <h3>Nueva categoría</h3>
+            <div className="lead">Dale nombre, icono, color y máximo mensual.</div>
+            <div className="field"><label>Nombre</label><input type="text" value={catName} onChange={e=>setCatName(e.target.value)} maxLength={24} placeholder="Ej. Mascotas" /></div>
+            <div className="field"><label>Icono</label>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <span className="cat-ico" style={{"--c":colorOf(catColor).a,"--t":colorOf(catColor).soft}}><Icon id={catIcon} /></span>
+                <select value={catIcon} onChange={e=>setCatIcon(e.target.value)} style={{flex:1,minHeight:44,border:'1.5px solid var(--border)',borderRadius:10,padding:'0 10px',background:'var(--surface)'}}>
+                  {ICON_LIB.map(o=> <option key={o.id} value={o.id}>{ICON_N[o.id]||o.id}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="field"><label>Color</label>
+              <div style={{display:'flex',gap:10,alignItems:'center'}}>
+                <span style={{width:22,height:22,borderRadius:7,background:colorOf(catColor).a,display:'inline-block',flex:'0 0 22px'}} />
+                <select value={catColor} onChange={e=>setCatColor(e.target.value)} style={{flex:1,minHeight:44,border:'1.5px solid var(--border)',borderRadius:10,padding:'0 10px',background:'var(--surface)'}}>
+                  {COLORS.map(c=> <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="field"><label>Máximo mensual ({state.currency})</label><input type="number" value={catMax} onChange={e=>setCatMax(e.target.value)} min="0" step="any" inputMode="decimal" placeholder="200" /></div>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={closeCatModal}>Cancelar</button>
+              <button className="btn btn-primary" data-od-id="cta-category-confirm" onClick={submitCat}>Crear</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {varModal && (
         <div className="modal">
@@ -729,6 +794,17 @@ export default function App(){
       </aside>
 
       <div className={`toast${toast?' show':''}`}>{toast}</div>
+
+      {splash && (
+        <div
+          className={`splash${splashOut?' out':''}`}
+          role="presentation"
+          aria-hidden="true"
+          onClick={()=>{ setSplashOut(true); setTimeout(()=> setSplash(false), 420) }}
+        >
+          <img src="/splash.png" alt="" draggable="false" />
+        </div>
+      )}
     </div>
   )
 }
