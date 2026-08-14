@@ -264,9 +264,7 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
 .sw span{font-size:11px;color:var(--muted);font-weight:600}
 .sw.on i{border-color:var(--fg);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--c)}
 .sw.on span{color:var(--fg)}
-.chat-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg)}
-.chat-foot .demo{font-size:12.5px;color:var(--muted)}
-.chat-foot .demo b{color:var(--accent-strong);cursor:pointer;font-weight:700}
+.chat-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);font-size:12.5px;color:var(--muted)}
 
 /* ---------- Cat list (settings) ---------- */
 .cat-list{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
@@ -426,7 +424,7 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
   <div class="modal-card">
     <h3>Ingreso variable</h3>
     <div class="lead">Registra un ingreso extra de este mes (venta, extra, freelance...).</div>
-    <div class="field"><label>Monto (€)</label><input type="number" id="varAmount" min="0" step="any" inputmode="decimal"></div>
+    <div class="field"><label id="varAmountLabel">Monto</label><input type="number" id="varAmount" min="0" step="any" inputmode="decimal"></div>
     <div class="field"><label>Concepto (opcional)</label><input type="text" id="varConcept" maxlength="40"></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeVarModal()">Cancelar</button>
@@ -501,7 +499,8 @@ var FREQ = {
   semanal:   { label:'Semanal',   pays:52/12, period:'por semana' }
 };
 
-function fmt(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(n)); }
+var CURRENCIES = [{id:'EUR',symbol:'€',name:'Euro'},{id:'USD',symbol:'$',name:'Dólar'},{id:'GBP',symbol:'£',name:'Libra'},{id:'JPY',symbol:'¥',name:'Yen'},{id:'BRL',symbol:'R$',name:'Real'},{id:'MXN',symbol:'MX$',name:'Peso mexicano'}];
+function fmt(n){ var cur=(state&&state.currency)?state.currency:'€'; var v=Math.round(n); return new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(v)+' '+cur; }
 function today(){ return new Date().toLocaleDateString('es-ES',{day:'numeric',month:'short'}); }
 function perMonth(f){ return FREQ[f].pays; }
 function incomePerPay(){ return state.ingresoMensual / perMonth(state.freq); }
@@ -520,32 +519,9 @@ function envName(e){ return e.name || (LEGACY[e.id] ? LEGACY[e.id].name : 'Categ
 function envIconId(e){ return e.icon || (LEGACY[e.id] ? e.id : 'comida'); }
 function esc(s){ return String(s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
-var DEMO_MAX = { comida:650, transporte:180, renta:950, servicios:320, gustos:240, ahorro:300, emergencias:200, deudas:150 };
-
 function buildFresh(){
   return { view:'onboarding', freq:'quincenal', ingresoMensual:0, received:0,
-           varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'', onbStep:0, onbMsgs:[], envelopes:[] };
-}
-
-function buildDemo(){
-  function mk(id, bal, txns){
-    var l = LEGACY[id];
-    return { id:id, name:l.name, icon:l.icon, color:l.c, tint:l.t, on:true, max:DEMO_MAX[id], balance:bal, txns:txns };
-  }
-  return {
-    view:'dashboard', freq:'quincenal', ingresoMensual:3600, received:1800,
-    varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'Alex', onbStep:0, onbMsgs:[],
-    envelopes:[
-      mk('comida', 330, [{kind:'aporte',amount:325,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:78,note:'Mercado semanal',date:'6 ago'},{kind:'gasto',amount:90,note:'Despensa',date:'10 ago'}]),
-      mk('transporte', 95, [{kind:'aporte',amount:90,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:20,note:'Recarga de metro',date:'8 ago'}]),
-      mk('renta', 475, [{kind:'aporte',amount:475,note:'Aporte de nómina',date:'3 ago'},{kind:'aporte',amount:475,note:'Aporte anterior',date:'20 jul'}]),
-      mk('servicios', 170, [{kind:'aporte',amount:160,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:34,note:'Luz y agua',date:'9 ago'}]),
-      mk('gustos', 140, [{kind:'aporte',amount:120,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:42,note:'Cine y cena',date:'11 ago'}]),
-      mk('ahorro', 150, [{kind:'aporte',amount:150,note:'Aporte de nómina',date:'3 ago'}]),
-      mk('emergencias', 100, [{kind:'aporte',amount:100,note:'Aporte de nómina',date:'3 ago'}]),
-      mk('deudas', 150, [{kind:'aporte',amount:75,note:'Aporte de nómina',date:'3 ago'},{kind:'aporte',amount:75,note:'Aporte anterior',date:'20 jul'}])
-    ]
-  };
+           varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'', onbStep:0, onbMsgs:[], envelopes:[], currency:'€' };
 }
 
 /* ---------------- State ---------------- */
@@ -559,6 +535,7 @@ function load(){
     var s = JSON.parse(raw);
     if(!s || !Array.isArray(s.envelopes)) return null;
     if(s.appColor==null) s.appColor='teal';
+    if(s.currency==null) s.currency='€';
     if(s.name==null) s.name='';
     if(s.varIncome==null) s.varIncome=false;
     if(s.varTotal==null) s.varTotal=0;
@@ -613,7 +590,7 @@ function renderSidebarFoot(){
   var f = FREQ[state.freq];
   el.innerHTML =
     '<span class="side-chip">Ingreso por pago: <b>'+fmt(incomePerPay())+'</b> · cobras '+f.label.toLowerCase()+'</span>'+
-    '<span class="pill"><i></i>Prototipo interactivo</span>';
+    '<span class="pill"><i></i>100% offline</span>';
 }
 
 /* ---------------- Dashboard ---------------- */
@@ -998,6 +975,7 @@ function renderSettings(){
       '<div class="rows">'+
         '<div class="field"><label>Cada cuánto cobras</label><div class="seg">'+seg+'</div></div>'+
         '<div class="field hint"><label>Ingreso por pago</label><input type="number" id="setIncome" min="0" step="any" value="'+Math.round(incomePerPay())+'" oninput="setIncomeChanged(this.value)"><span class="hint" id="setHint">Equivale a <strong>'+fmt(state.ingresoMensual)+'</strong> al mes</span></div>'+
+        '<div class="field" style="margin-top:12px"><label>Moneda</label><div class="seg" style="flex-wrap:wrap;gap:2px">'+(function(){var h='';for(var ci=0;ci<CURRENCIES.length;ci++){var c=CURRENCIES[ci];h+='<button data-od-id="set-cur-'+c.id+'" class="'+(state.currency===c.symbol?'active':'')+'" style="min-width:56px;padding:8px 12px;font-size:13px" onclick="setCurr(\''+c.symbol+'\')">'+c.symbol+' · '+c.name+'</button>';}return h;})()+'</div></div>'+
         '<div style="margin-top:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
           '<label style="display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);cursor:pointer;min-height:44px">'+
             '<input type="checkbox" id="setVar" '+(state.varIncome?'checked':'')+' onchange="toggleVar(this.checked)" style="width:20px;height:20px;accent-color:var(--accent-strong);flex:0 0 20px">'+
@@ -1012,24 +990,24 @@ function renderSettings(){
       '<div class="cat-list" style="margin-top:16px;grid-template-columns:1fr">'+list+'</div>'+
     '</div>'+
     '<div class="card" data-od-id="card-settings-actions">'+
-      '<div class="card-t">Reinicio</div><div class="card-s">Carga los datos de ejemplo o empieza el asistente desde cero.</div>'+
+      '<div class="card-t">Datos</div><div class="card-s">Borra todos tus datos y vuelve a empezar. Esta acción no se puede deshacer.</div>'+
       '<div class="d-actions" style="margin-top:16px">'+
-        '<button class="btn btn-ghost" onclick="loadDemo()">Restablecer ejemplo</button>'+
-        '<button class="btn btn-danger" onclick="resetApp()">Empezar de cero</button>'+
+        '<button class="btn btn-danger" onclick="resetApp()">Borrar todos los datos</button>'+
       '</div>'+
     '</div>';
 }
 function toggleEnv(id){ var e=getEnv(id); e.on=!e.on; save(); }
 function envMax(id,v){ var e=getEnv(id); var n=parseFloat(v); e.max=(n>0&&isFinite(n))?Math.round(n):0; save(); renderSidebarFoot(); }
 function setIncomeChanged(v){ var n=parseFloat(v); state.ingresoMensual=(n>0&&isFinite(n))?n*perMonth(state.freq):0; save(); var h=document.getElementById('setHint'); if(h) h.innerHTML='Equivale a <strong>'+fmt(state.ingresoMensual)+'</strong> al mes'; renderSidebarFoot(); }
-function loadDemo(){ state=buildDemo(); state.view='dashboard'; save(); go('dashboard'); toast('Datos de ejemplo restablecidos'); }
-function resetApp(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} state=buildFresh(); save(); go('onboarding'); toast('Organibot te acompaña de nuevo'); }
+function setCurr(s){ state.currency=s; save(); renderSettings(); renderSidebarFoot(); toast('Moneda: '+s); }
+function resetApp(){ try{ localStorage.removeItem(STORAGE_KEY); }catch(e){} state=buildFresh(); save(); go('onboarding'); toast('Datos borrados'); }
 function toggleVar(ch){ state.varIncome=!!ch; save(); renderSettings(); toast(ch?'Ingresos variables activados':'Ingresos variables desactivados'); }
 
 /* ---------------- Variable income · Modal ---------------- */
 
 function openVarModal(){
   document.getElementById('modal').hidden = false;
+  var lbl=document.getElementById('varAmountLabel'); if(lbl) lbl.textContent='Monto ('+state.currency+')';
   document.getElementById('scrim').classList.add('show');
   setTimeout(function(){ var a=document.getElementById('varAmount'); if(a) a.focus(); },40);
 }
@@ -1069,7 +1047,7 @@ function obTranscript(){
   }
   if(state.onbStep>=2){
     t.push(obBot('<b>'+esc(state.name)+',</b> ¿cada cuánto cobras?'));
-    t.push(obUser(FREQ[state.freq].label+' · <b>'+fmt(state.ingresoMensual)+' €</b> al mes'));
+    t.push(obUser(FREQ[state.freq].label+' · <b>'+fmt(state.ingresoMensual)+'</b> al mes'));
   }
   if(state.onbStep>=3){
     t.push(obBot('¿Tus ingresos son variables?'));
@@ -1079,10 +1057,14 @@ function obTranscript(){
     t.push(obBot('Ahora crea tus <b>categorías de gasto</b> con su máximo mensual.'));
     for(var i=0;i<state.envelopes.length;i++){
       var e = state.envelopes[i];
-      t.push(obUser('<b>'+esc(envName(e))+'</b> · <b>'+fmt(e.max)+' €</b> <span class="memo">máximo al mes</span>'));
+      t.push(obUser('<b>'+esc(envName(e))+'</b> · <b>'+fmt(e.max)+'</b> <span class="memo">máximo al mes</span>'));
     }
   }
   if(state.onbStep>=5){
+    t.push(obBot('¿Qué <b>símbolo de moneda</b> usas?'));
+    t.push(obUser(esc(state.currency)));
+  }
+  if(state.onbStep>=6){
     t.push(obBot('¿De qué color quieres la app?'));
     t.push(obUser(colorOf(state.appColor).name));
   }
@@ -1106,7 +1088,7 @@ function obPrompt(step){
         '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub">'+
           '<div class="radios">'+seg+'</div>'+
           '<div class="fld" style="margin-top:12px"><input type="text" id="obIncome" inputmode="decimal" aria-label="Ingreso por pago"><button class="btn btn-primary" data-od-id="onb-salary" onclick="obSalaryDone()">Listo</button></div>'+
-          '<span class="memo">Ejemplo: si cobras 1800 € cada quincena, escribe 1800.</span>'+
+          '<span class="memo">Introduce el monto tal cual lo recibes en cada pago.</span>'+
         '</div></div>';
     case 3:
       return obBot('¿Tus ingresos son <b>variables</b>? (ventas, extras, freelance, comisiones...)')+
@@ -1128,12 +1110,18 @@ function obPrompt(step){
           (state.envelopes.length?'<div class="chip-row">'+state.envelopes.map(obChip).join('')+'</div>':'')+
         '</div></div></div>';
     case 5:
+      return obBot('¿Qué <b>símbolo de moneda</b> usas? (ej. €, $, £)')+
+        '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub">'+
+          '<div class="seg" style="flex-wrap:wrap;gap:6px">'+(function(){var h='';for(var ci=0;ci<CURRENCIES.length;ci++){var c=CURRENCIES[ci];h+='<button data-od-id="onb-cur-'+c.id+'" class="'+(state.currency===c.symbol?'active':'')+'" style="min-width:72px;padding:10px 14px;border-radius:10px;font-weight:700" onclick="obSetCurr(\''+c.symbol.replace(/'/g,"\\'")+'\')">'+c.symbol+' · '+c.name+'</button>';}return h;})()+'</div>'+
+          '<div class="fld" style="margin-top:12px"><input type="text" id="obCurr" maxlength="4" value="'+esc(state.currency)+'" aria-label="Símbolo de moneda" style="max-width:120px"><button class="btn btn-primary" data-od-id="onb-cur-done" onclick="obCurrDone()">Siguiente</button></div>'+
+        '</div></div>';
+    case 6:
       return obBot('¡Buen trabajo! Último detalle: <b>¿de qué color</b> quieres la app?')+
         '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub">'+
           '<div class="sw-grid">'+obAppSwatches()+'</div>'+
-          (state.colorChosen ? '<div class="cf-add" style="margin-top:14px"><button class="btn btn-primary" data-od-id="onb-done-color" onclick="obGo(6)">Terminado</button></div>' : '')+
+          (state.colorChosen ? '<div class="cf-add" style="margin-top:14px"><button class="btn btn-primary" data-od-id="onb-done-color" onclick="obGo(7)">Terminado</button></div>' : '')+
         '</div></div>';
-    case 6:
+    case 7:
       return obBot('¡Bienvenido, <b>'+esc(state.name)+'</b>! Ya tienes <b>'+state.envelopes.length+'</b> sobres listos'+(state.varIncome?' y los <b>ingresos variables</b> activados':'')+'. Cuando cobres, pulsa "Registrar ingreso" y yo repartiré el dinero en tus sobres.')+
         '<div class="msg bot"><div class="av">'+OB_AV+'</div><div class="bub"><div class="tool"><button class="btn btn-primary" data-od-id="onb-finish" onclick="finishOnboarding()">¡Ir a mis sobres!</button></div></div></div>';
   }
@@ -1150,7 +1138,7 @@ function renderOnboarding(){
     '<div class="onb-wrap"><div class="chat">'+
       '<div class="chat-head"><div class="bot-ico">'+OB_AV+'</div><div><div class="tt">Organibot</div><div class="st">Asistente de configuración</div></div></div>'+
       '<div class="chat-body" id="chatBody">'+body+'</div>'+
-      '<div class="chat-foot"><span class="demo">¿Con prisa? <b onclick="onbFreqSwap()">Usar ejemplo</b></span></div>'+
+      '<div class="chat-foot"><span style="font-size:12.5px;color:var(--muted)">Tus datos se guardan solo en este dispositivo</span></div>'+
     '</div></div>';
   var c = document.getElementById('chatBody');
   c.scrollTop = c.scrollHeight;
@@ -1247,7 +1235,8 @@ function obAppColor(id){
   save();
   renderOnboarding();
 }
-function onbFreqSwap(){ state=buildDemo(); save(); go('dashboard'); toast('Datos de ejemplo cargados'); }
+function obSetCurr(s){ state.currency=s; var el=document.getElementById('obCurr'); if(el) el.value=s; save(); renderOnboarding(); }
+function obCurrDone(){ var el=document.getElementById('obCurr'); var v=el?el.value.trim().slice(0,4):''; if(!v){ toast('Elige un símbolo de moneda'); return; } state.currency=v; save(); obGo(6); }
 function finishOnboarding(){
   if(!(state.ingresoMensual>0)){ toast('Primero escribe tu ingreso'); return; }
   if(!state.envelopes.length){ toast('Añade al menos una categoría'); return; }

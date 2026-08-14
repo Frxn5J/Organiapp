@@ -60,33 +60,21 @@ const FREQ = {
   semanal:   { label:'Semanal',   pays:52/12, period:'por semana' }
 }
 
-const DEMO_MAX = { comida:650, transporte:180, renta:950, servicios:320, gustos:240, ahorro:300, emergencias:200, deudas:150 }
+const CURRENCIES = [
+  { id:'EUR', symbol:'€', name:'Euro' },
+  { id:'USD', symbol:'$', name:'Dólar' },
+  { id:'GBP', symbol:'£', name:'Libra' },
+  { id:'JPY', symbol:'¥', name:'Yen' },
+  { id:'BRL', symbol:'R$', name:'Real' },
+  { id:'MXN', symbol:'MX$', name:'Peso mexicano' },
+]
 
-function fmt(n){ return new Intl.NumberFormat('es-ES',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(Math.round(n)) }
+function fmtBase(n, cur='€'){ const v=Math.round(n); const f=new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(v); return `${f} ${cur}` }
 function today(){ return new Date().toLocaleDateString('es-ES',{day:'numeric',month:'short'}) }
 function colorOf(id){ return COLORS.find(c=>c.id===id) || COLORS[0] }
 
 function buildFresh(){
-  return { view:'onboarding', freq:'quincenal', ingresoMensual:0, received:0, varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'', onbStep:0, onbMsgs:[], envelopes:[] }
-}
-function buildDemo(){
-  function mk(id, bal, txns){
-    const l = LEGACY[id]
-    return { id, name:l.name, icon:l.icon, color:l.c, tint:l.t, on:true, max:DEMO_MAX[id], balance:bal, txns }
-  }
-  return {
-    view:'dashboard', freq:'quincenal', ingresoMensual:3600, received:1800, varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'Alex', onbStep:0, onbMsgs:[],
-    envelopes:[
-      mk('comida', 330, [{kind:'aporte',amount:325,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:78,note:'Mercado semanal',date:'6 ago'},{kind:'gasto',amount:90,note:'Despensa',date:'10 ago'}]),
-      mk('transporte', 95, [{kind:'aporte',amount:90,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:20,note:'Recarga de metro',date:'8 ago'}]),
-      mk('renta', 475, [{kind:'aporte',amount:475,note:'Aporte de nómina',date:'3 ago'},{kind:'aporte',amount:475,note:'Aporte anterior',date:'20 jul'}]),
-      mk('servicios', 170, [{kind:'aporte',amount:160,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:34,note:'Luz y agua',date:'9 ago'}]),
-      mk('gustos', 140, [{kind:'aporte',amount:120,note:'Aporte de nómina',date:'3 ago'},{kind:'gasto',amount:42,note:'Cine y cena',date:'11 ago'}]),
-      mk('ahorro', 150, [{kind:'aporte',amount:150,note:'Aporte de nómina',date:'3 ago'}]),
-      mk('emergencias', 100, [{kind:'aporte',amount:100,note:'Aporte de nómina',date:'3 ago'}]),
-      mk('deudas', 150, [{kind:'aporte',amount:75,note:'Aporte de nómina',date:'3 ago'},{kind:'aporte',amount:75,note:'Aporte anterior',date:'20 jul'}])
-    ]
-  }
+  return { view:'onboarding', freq:'quincenal', ingresoMensual:0, received:0, varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'', onbStep:0, onbMsgs:[], envelopes:[], currency:'€' }
 }
 
 const STORAGE_KEY = 'sobres-app-v2'
@@ -97,6 +85,7 @@ function loadState(){
     const s = JSON.parse(raw)
     if(!s || !Array.isArray(s.envelopes)) return null
     if(s.appColor==null) s.appColor='teal'
+    if(s.currency==null) s.currency='€'
     if(s.name==null) s.name=''
     if(s.varIncome==null) s.varIncome=false
     if(s.varTotal==null) s.varTotal=0
@@ -230,6 +219,7 @@ export default function App(){
 
   const [topTitle, topSub] = topbarTitle()
   const freqTxt = FREQ[state.freq].period
+  const fmt = (n) => fmtBase(n, state.currency)
 
   function renderDashboard(){
     const paidPays = state.ingresoMensual>0 ? Math.round(state.received/incomePerPay()) : 0
@@ -423,6 +413,9 @@ export default function App(){
               ))}
             </div></div>
             <div className="field hint"><label>Ingreso por pago</label><input type="number" value={Math.round(incomePerPay())||''} min="0" step="any" onChange={e=>{ const n=parseFloat(e.target.value); update(prev=>({...prev, ingresoMensual:(n>0&&isFinite(n))? n*perMonth(prev.freq):0})) }} /><span className="hint">Equivale a <strong>{fmt(state.ingresoMensual)}</strong> al mes</span></div>
+            <div className="field" style={{marginTop:12}}><label>Moneda</label><div className="seg" style={{flexWrap:'wrap',gap:2}}>{CURRENCIES.map(c=>(
+              <button key={c.id} data-od-id={`set-cur-${c.id}`} className={state.currency===c.symbol?'active':''} style={{minWidth:56,padding:'8px 12px',fontSize:13}} onClick={()=>{ update({currency:c.symbol}); showToast('Moneda: '+c.symbol) }}>{c.symbol} · {c.name}</button>
+            ))}</div></div>
             <div style={{marginTop:16,display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
               <label style={{display:'flex',alignItems:'center',gap:10,fontSize:'13.5px',color:'var(--muted)',cursor:'pointer',minHeight:44}}>
                 <input type="checkbox" checked={state.varIncome} onChange={e=>{ update({varIncome:e.target.checked}); showToast(e.target.checked?'Ingresos variables activados':'Ingresos variables desactivados') }} style={{width:20,height:20,accentColor:'var(--accent-strong)',flex:'0 0 20px'}} />
@@ -449,10 +442,9 @@ export default function App(){
           </div>
         </div>
         <div className="card" data-od-id="card-settings-actions">
-          <div className="card-t">Reinicio</div><div className="card-s">Carga los datos de ejemplo o empieza el asistente desde cero.</div>
+          <div className="card-t">Datos</div><div className="card-s">Borra todos tus datos y vuelve a empezar. Esta acción no se puede deshacer.</div>
           <div className="d-actions" style={{marginTop:16}}>
-            <button className="btn btn-ghost" onClick={()=>{ const d=buildDemo(); save(d); setState(d); showToast('Datos de ejemplo restablecidos') }}>Restablecer ejemplo</button>
-            <button className="btn btn-danger" onClick={()=>{ try{localStorage.removeItem(STORAGE_KEY)}catch{}; const f=buildFresh(); save(f); setState(f); showToast('Organibot te acompaña de nuevo') }}>Empezar de cero</button>
+            <button className="btn btn-danger" onClick={()=>{ try{localStorage.removeItem(STORAGE_KEY)}catch{}; const f=buildFresh(); save(f); setState(f); showToast('Datos borrados') }}>Borrar todos los datos</button>
           </div>
         </div>
       </>
@@ -537,7 +529,7 @@ export default function App(){
       }
       if(state.onbStep>=2){
         t.push(<div key="b3" className="msg bot"><div className="av">{OB_AV}</div><div className="bub"><b>{state.name},</b> ¿cada cuánto cobras?</div></div>)
-        t.push(<div key="u2" className="msg user"><div className="bub">{FREQ[state.freq].label} · <b>{fmt(state.ingresoMensual)} €</b> al mes</div></div>)
+        t.push(<div key="u2" className="msg user"><div className="bub">{FREQ[state.freq].label} · <b>{fmt(state.ingresoMensual)}</b> al mes</div></div>)
       }
       if(state.onbStep>=3){
         t.push(<div key="b4" className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¿Tus ingresos son variables?</div></div>)
@@ -546,12 +538,16 @@ export default function App(){
       if(state.onbStep>=4){
         t.push(<div key="b5" className="msg bot"><div className="av">{OB_AV}</div><div className="bub">Ahora crea tus <b>categorías de gasto</b> con su máximo mensual.</div></div>)
         for(const e of state.envelopes){
-          t.push(<div key={`u-cat-${e.id}`} className="msg user"><div className="bub"><b>{envName(e)}</b> · <b>{fmt(e.max)} €</b> <span className="memo">máximo al mes</span></div></div>)
+          t.push(<div key={`u-cat-${e.id}`} className="msg user"><div className="bub"><b>{envName(e)}</b> · <b>{fmt(e.max)}</b> <span className="memo">máximo al mes</span></div></div>)
         }
       }
       if(state.onbStep>=5){
-        t.push(<div key="b6" className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¿De qué color quieres la app?</div></div>)
-        t.push(<div key="u4" className="msg user"><div className="bub">{colorOf(state.appColor).name}</div></div>)
+        t.push(<div key="b6" className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¿Qué <b>símbolo de moneda</b> usas?</div></div>)
+        t.push(<div key="u4" className="msg user"><div className="bub">{state.currency}</div></div>)
+      }
+      if(state.onbStep>=6){
+        t.push(<div key="b7" className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¿De qué color quieres la app?</div></div>)
+        t.push(<div key="u5" className="msg user"><div className="bub">{colorOf(state.appColor).name}</div></div>)
       }
       return t
     }
@@ -573,7 +569,7 @@ export default function App(){
               const v=parseFloat(obIncome); if(!(v>0)||!isFinite(v)){showToast('Escribe un monto válido');return}
               update({ingresoMensual: Math.round(v*perMonth(state.freq)), onbStep:3}); setObIncome('')
             }}>Listo</button></div>
-            <span className="memo">Ejemplo: si cobras 1800 € cada quincena, escribe 1800.</span>
+            <span className="memo">Introduce el monto tal cual lo recibes en cada pago.</span>
           </div></div></>
         }
         case 3:
@@ -612,13 +608,25 @@ export default function App(){
           )
         }
         case 5:
+          return <><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¿Qué <b>símbolo de moneda</b> usas? (ej. €, $, £)</div></div><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">
+            <div className="seg" style={{flexWrap:'wrap',gap:6}}>
+              {CURRENCIES.map(c=>(
+                <button key={c.id} data-od-id={`onb-cur-${c.id}`} className={state.currency===c.symbol?'active':''} style={{minWidth:72,padding:'10px 14px',borderRadius:10,fontWeight:700}} onClick={()=>update({currency:c.symbol})}>{c.symbol} · {c.name}</button>
+              ))}
+            </div>
+            <div className="fld" style={{marginTop:12}}>
+              <input type="text" value={state.currency} onChange={e=>{ const v=e.target.value.slice(0,4); update({currency:v||'€'}) }} maxLength={4} aria-label="Símbolo de moneda" style={{maxWidth:120}} />
+              <button className="btn btn-primary" data-od-id="onb-cur-done" onClick={()=>{ if(!state.currency.trim()){showToast('Elige un símbolo de moneda');return} update({onbStep:6}) }}>Siguiente</button>
+            </div>
+          </div></div></>
+        case 6:
           return <><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¡Buen trabajo! Último detalle: <b>¿de qué color</b> quieres la app?</div></div><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">
             <div className="sw-grid">{COLORS.map(c=>(
               <button key={c.id} className={`sw${state.appColor===c.id?' on':''}`} style={{"--c":c.a}} data-od-id={`onb-color-${c.id}`} onClick={()=>update({appColor:c.id, colorChosen:true})}><i style={{background:'var(--c)'}} /><span>{c.name}</span></button>
             ))}</div>
-            {state.colorChosen && <div className="cf-add" style={{marginTop:14}}><button className="btn btn-primary" data-od-id="onb-done-color" onClick={()=>update({onbStep:6})}>Terminado</button></div>}
+            {state.colorChosen && <div className="cf-add" style={{marginTop:14}}><button className="btn btn-primary" data-od-id="onb-done-color" onClick={()=>update({onbStep:7})}>Terminado</button></div>}
           </div></div></>
-        case 6:
+        case 7:
           return <><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¡Bienvenido, <b>{state.name}</b>! Ya tienes <b>{state.envelopes.length}</b> sobres listos{state.varIncome?' y los ':' '}{state.varIncome?<b>ingresos variables</b>:null}{state.varIncome?' activados':''}. Cuando cobres, pulsa &quot;Registrar ingreso&quot; y yo repartiré el dinero en tus sobres.</div></div><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub"><div className="tool"><button className="btn btn-primary" data-od-id="onb-finish" onClick={()=>{
             if(!(state.ingresoMensual>0)){showToast('Primero escribe tu ingreso');return}
             if(!state.envelopes.length){showToast('Añade al menos una categoría');return}
@@ -636,7 +644,7 @@ export default function App(){
           {transcript()}
           {prompt()}
         </div>
-        <div className="chat-foot"><span className="demo">¿Con prisa? <b onClick={()=>{ const d=buildDemo(); save(d); setState(d); showToast('Datos de ejemplo cargados') }}>Usar ejemplo</b></span></div>
+        <div className="chat-foot"><span style={{fontSize:'12.5px',color:'var(--muted)'}}>Tus datos se guardan solo en este dispositivo</span></div>
       </div></div>
     )
   }
@@ -653,7 +661,7 @@ export default function App(){
           </div>
           <div className="sideFoot" id="sideFoot">
             <span className="side-chip">Ingreso por pago: <b>{fmt(incomePerPay())}</b> · cobras {FREQ[state.freq].label.toLowerCase()}</span>
-            <span className="pill"><i></i>Prototipo interactivo</span>
+            <span className="pill"><i></i>100% offline</span>
           </div>
         </div>
 
@@ -707,7 +715,7 @@ export default function App(){
           <div className="modal-card">
             <h3>Ingreso variable</h3>
             <div className="lead">Registra un ingreso extra de este mes (venta, extra, freelance...).</div>
-            <div className="field"><label>Monto (€)</label><input type="number" value={varAmount} onChange={e=>setVarAmount(e.target.value)} min="0" step="any" inputMode="decimal" /></div>
+            <div className="field"><label>Monto ({state.currency})</label><input type="number" value={varAmount} onChange={e=>setVarAmount(e.target.value)} min="0" step="any" inputMode="decimal" /></div>
             <div className="field"><label>Concepto (opcional)</label><input type="text" value={varConcept} onChange={e=>setVarConcept(e.target.value)} maxLength={40} /></div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={closeVarModal}>Cancelar</button>

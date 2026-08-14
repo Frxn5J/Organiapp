@@ -257,9 +257,7 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
 .sw span{font-size:11px;color:var(--muted);font-weight:600}
 .sw.on i{border-color:var(--fg);box-shadow:0 0 0 2px var(--surface),0 0 0 4px var(--c)}
 .sw.on span{color:var(--fg)}
-.chat-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg)}
-.chat-foot .demo{font-size:12.5px;color:var(--muted)}
-.chat-foot .demo b{color:var(--accent-strong);cursor:pointer;font-weight:700}
+.chat-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--bg);font-size:12.5px;color:var(--muted)}
 
 /* ---------- Cat list (settings) ---------- */
 .cat-list{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
