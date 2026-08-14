@@ -657,11 +657,10 @@ export default function App(){
         <div className="brandbar">
           <div className="brand" data-od-id="brand-home" onClick={()=>go('dashboard')}>
             <span className="brand-dot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5.5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><path d="M2 8.5l10 6 10-6"/></svg></span>
-            <span className="brand-name">Sobres</span>
+            <span className="brand-name">OrganiAPP</span>
           </div>
           <div className="sideFoot" id="sideFoot">
             <span className="side-chip">Ingreso por pago: <b>{fmt(incomePerPay())}</b> · cobras {FREQ[state.freq].label.toLowerCase()}</span>
-            <span className="pill"><i></i>100% offline</span>
           </div>
         </div>
 

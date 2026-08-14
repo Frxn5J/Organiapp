@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sobres · Organiza tu dinero en sobres</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>OrganiAPP</title>
 <style>
 :root{
   --bg:          oklch(98% 0.004 240);
@@ -29,6 +29,7 @@
   --font-mono:   ui-monospace,'SF Mono','Cascadia Mono',Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+html{height:100%;touch-action:pan-x pan-y}
 html,body{height:100%}
 body{
   font-family:var(--font-body);
@@ -383,7 +384,7 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
         <span class="brand-dot">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5h16a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><path d="M2 8.5l10 6 10-6"/></svg>
         </span>
-        <span class="brand-name">Sobres</span>
+        <span class="brand-name">OrganiAPP</span>
       </div>
       <div class="sideFoot" id="sideFoot"></div>
     </div>
@@ -589,8 +590,7 @@ function renderSidebarFoot(){
   if(!el) return;
   var f = FREQ[state.freq];
   el.innerHTML =
-    '<span class="side-chip">Ingreso por pago: <b>'+fmt(incomePerPay())+'</b> · cobras '+f.label.toLowerCase()+'</span>'+
-    '<span class="pill"><i></i>100% offline</span>';
+    '<span class="side-chip">Ingreso por pago: <b>'+fmt(incomePerPay())+'</b> · cobras '+f.label.toLowerCase()+'</span>';
 }
 
 /* ---------------- Dashboard ---------------- */
