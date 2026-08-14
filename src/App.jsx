@@ -213,7 +213,14 @@ export default function App(){
 
   function perMonth(f){ return FREQ[f].pays }
   function incomePerPay(){ return state.ingresoMensual / perMonth(state.freq) }
-  function contrib(e){ return Math.round(e.max / perMonth(state.freq)) }
+  function isFull(e){ return !!e.on && e.max>0 && e.balance >= e.max }
+  function remaining(e){ return Math.max(0, e.max - e.balance) }
+  function contrib(e){
+    if(!e.on) return 0
+    if(e.balance >= e.max) return 0
+    const raw = Math.round(e.max / perMonth(state.freq))
+    return Math.min(raw, e.max - e.balance)
+  }
   function totalContrib(){ return state.envelopes.filter(e=>e.on).reduce((s,e)=> s+contrib(e),0) }
   function freePerPay(){ return incomePerPay() - totalContrib() }
   function totalBalance(){ return state.envelopes.filter(e=>e.on).reduce((s,e)=> s+e.balance,0) }
@@ -224,18 +231,24 @@ export default function App(){
 
   function receiveIncome(){
     if(state.received >= state.ingresoMensual - 0.01){ showToast('Ya recibiste tus pagos de este mes'); return }
-    const total = totalContrib()
     const t = today()
+    let total = 0
+    let skipped = 0
     update(prev=>{
       const envelopes = prev.envelopes.map(e=>{
         if(!e.on) return e
-        const c = Math.round(e.max / perMonth(prev.freq))
+        if(e.balance >= e.max){ skipped++; return e }
+        const raw = Math.round(e.max / perMonth(prev.freq))
+        const c = Math.min(raw, e.max - e.balance)
+        if(c<=0){ skipped++; return e }
+        total += c
         return { ...e, balance: e.balance + c, txns: [{kind:'aporte', amount:c, note:'Aporte de nómina', date:t}, ...e.txns] }
       })
       return { ...prev, envelopes, received: Math.min(prev.received + prev.ingresoMensual/perMonth(prev.freq), prev.ingresoMensual) }
     })
     setPop(true); setTimeout(()=>setPop(false),600)
-    showToast('Ingreso registrado · '+fmt(total)+' repartidos en tus sobres')
+    if(total>0) showToast('Ingreso registrado · '+fmt(total)+' repartidos en tus sobres'+(skipped?' · '+skipped+' lleno'+(skipped>1?'s':'')+' omitido'+(skipped>1?'s':''):''))
+    else showToast('Todos tus sobres ya están llenos')
   }
 
   function openVarModal(){ setVarModal(true); setVarAmount(''); setVarConcept('') }
@@ -316,15 +329,16 @@ export default function App(){
           {on.map(ev=>{
             const ec=envColor(ev)
             const pct = ev.max>0 ? Math.min(100, Math.round(ev.balance/ev.max*100)) : 0
+            const full = isFull(ev)
             return (
-              <button key={ev.id} className="env" data-od-id={`envelope-card-${ev.id}`} onClick={()=>setDrawerId(ev.id)}>
+              <button key={ev.id} className={`env${full?' full':''}`} data-od-id={`envelope-card-${ev.id}`} onClick={()=>setDrawerId(ev.id)}>
                 <div className="env-top">
                   <span className="env-ico" style={{"--c":ec.c,"--t":ec.t}}><Icon id={envIconId(ev)} /></span>
-                  <div><div className="env-name">{envName(ev)}</div><div className="env-meta">Meta mensual · {fmt(ev.max)}</div></div>
+                  <div><div className="env-name">{envName(ev)}{full && <span style={{marginLeft:8,fontSize:11,fontWeight:800,color:'var(--ok)',background:'var(--ok-soft)',border:'1px solid oklch(88% 0.06 155)',padding:'2px 7px',borderRadius:99}}>Lleno</span>}</div><div className="env-meta">Meta mensual · {fmt(ev.max)}{full?' · lleno':''}</div></div>
                   <div className="env-bal mono">{fmt(ev.balance)}</div>
                 </div>
                 <div className="env-bar"><i style={{width:pct+'%', background:ec.c}} /></div>
-                <div className="env-foot"><span>{freqTxt} · aportación</span><strong>{fmt(contrib(ev))}</strong></div>
+                <div className="env-foot"><span>{full ? 'Lleno · sin aportación' : `${freqTxt} · aportación`}</span><strong>{full ? '—' : fmt(contrib(ev))}</strong></div>
               </button>
             )
           })}
@@ -500,13 +514,16 @@ export default function App(){
     if(!e) return null
     const ec=envColor(e)
     const pct = e.max>0 ? Math.min(100, Math.round(e.balance/e.max*100)) : 0
+    const full = isFull(e)
     const amtNum = parseFloat(miniAmt)
     const hasErr = miniAmt && !(amtNum>0) ? false : (miniMode==='gasto' && amtNum>e.balance)
-    const canSubmit = miniAmt && amtNum>0 && !(miniMode==='gasto' && amtNum>e.balance)
+    const overAporte = miniMode==='aporte' && amtNum>0 && e.balance+Math.round(amtNum) > e.max
+    const canSubmit = miniAmt && amtNum>0 && !(miniMode==='gasto' && amtNum>e.balance) && !(miniMode==='aporte' && amtNum>0 && e.balance+Math.round(amtNum) > e.max)
     function submitMini(){
       const amt = parseFloat(miniAmt)
       if(!(amt>0)) return
       if(miniMode==='gasto' && amt>e.balance) return
+      if(miniMode==='aporte' && e.balance+Math.round(amt) > e.max) return
       const note = miniNote.trim() || (miniMode==='gasto' ? 'Gasto en '+envName(e) : 'Aporte manual')
       update(prev=>({
         ...prev,
@@ -538,6 +555,7 @@ export default function App(){
             <button className="btn btn-primary btn-sm" data-od-id="drawer-btn-spend" onClick={()=>setMiniMode('gasto')}>Añadir gasto</button>
             <button className="btn btn-ghost btn-sm" data-od-id="drawer-btn-fund" onClick={()=>setMiniMode('aporte')}>Añadir dinero</button>
           </div>
+          {full && <div className="banner banner-ok" style={{fontSize:13,padding:'10px 12px'}}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="M22 4L12 14l-3-3"/></svg>Sobre lleno — ya no se aportará en los próximos ingresos.</div>}
           <div className="mini-form">
             <div className="card-t">{miniMode==='gasto'?'Nuevo gasto':'Aportar dinero'}</div>
             <div className="row">
@@ -545,6 +563,7 @@ export default function App(){
               <input type="text" value={miniNote} onChange={ev=>setMiniNote(ev.target.value)} maxLength={40} aria-label="Nota" />
             </div>
             {hasErr && <div className="form-err">No hay suficiente saldo. Ajusta el monto o aporta más a este sobre.</div>}
+            {overAporte && <div className="form-err">Supera el máximo ({fmt(e.max)}). Solo caben {fmt(remaining(e))} más.</div>}
             <button className="btn btn-primary btn-sm" disabled={!canSubmit} onClick={submitMini}>{miniMode==='gasto'?'Registrar gasto':'Aportar dinero'}</button>
           </div>
           <div className="card-t">Historial <span className="card-s">({e.txns.length})</span></div>

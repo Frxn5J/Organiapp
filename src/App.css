@@ -146,6 +146,7 @@ input{font-family:inherit;color:var(--fg)}
   transition:border-color .15s,transform .15s,box-shadow .15s;min-height:44px;
 }
 .env:hover{border-color:oklch(82% 0.01 240);transform:translateY(-2px);box-shadow:0 1px 2px rgba(20,30,40,.05),0 16px 34px -18px rgba(20,30,40,.22)}
+.env.full{border-color:oklch(88% 0.06 155);background:linear-gradient(180deg, var(--ok-soft), var(--surface))}
 .env-top{display:flex;align-items:center;gap:12px}
 .env-ico{width:42px;height:42px;border-radius:12px;background:var(--t);color:var(--c);display:grid;place-items:center;flex:0 0 42px}
 .env-ico svg{width:21px;height:21px}
