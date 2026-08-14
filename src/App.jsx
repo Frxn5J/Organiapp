@@ -127,8 +127,6 @@ export default function App(){
   const [obName, setObName] = useState('')
   const [obIncome, setObIncome] = useState('')
   const [pop, setPop] = useState(false)
-  const [splash, setSplash] = useState(true)
-  const [splashOut, setSplashOut] = useState(false)
   const toastTimer = useRef(null)
   const chatBodyRef = useRef(null)
 
@@ -157,15 +155,8 @@ export default function App(){
   })
 
   useEffect(()=>{
-    const t1 = setTimeout(()=> setSplashOut(true), 1500)
-    const t2 = setTimeout(()=> setSplash(false), 1950)
-    return ()=>{ clearTimeout(t1); clearTimeout(t2) }
-  }, [])
-
-  useEffect(()=>{
     function onEsc(e){
       if(e.key==='Escape'){
-        if(splash) return
         if(catModal) setCatModal(false)
         else if(varModal) setVarModal(false)
         else if(drawerId) setDrawerId(null)
@@ -173,7 +164,7 @@ export default function App(){
     }
     document.addEventListener('keydown', onEsc)
     return ()=> document.removeEventListener('keydown', onEsc)
-  }, [varModal, drawerId, splash, catModal])
+  }, [varModal, drawerId, catModal])
 
   function openCatModal(){
     setCatName(''); setCatIcon('comida'); setCatColor('teal'); setCatMax(''); setCatModal(true)
@@ -794,17 +785,6 @@ export default function App(){
       </aside>
 
       <div className={`toast${toast?' show':''}`}>{toast}</div>
-
-      {splash && (
-        <div
-          className={`splash${splashOut?' out':''}`}
-          role="presentation"
-          aria-hidden="true"
-          onClick={()=>{ setSplashOut(true); setTimeout(()=> setSplash(false), 420) }}
-        >
-          <img src="/splash.png" alt="" draggable="false" />
-        </div>
-      )}
     </div>
   )
 }
