@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'favicon-16.png', 'favicon-32.png', 'favicon-48.png', 'favicon-192.png', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png', 'splash.png', 'android/*.png', 'ios/*.png'],
       manifest: {
         name: 'OrganiAPP',
@@ -39,7 +39,7 @@ export default defineConfig({
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         clientsClaim: true,
-        skipWaiting: true,
+        skipWaiting: false,
         navigateFallbackDenylist: [/^\/sw\.js$/, /^\/registerSW\.js$/]
       },
       devOptions: { enabled: false }
