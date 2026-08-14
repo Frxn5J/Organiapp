@@ -284,9 +284,14 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
 .modal-card .lead{font-size:13px;color:var(--muted);margin-bottom:18px}
 .modal-card .field{margin-bottom:14px}
 .modal-card .field label{display:block;font-size:12.5px;font-weight:700;margin-bottom:6px;color:var(--muted)}
-.modal-card input[type=number],.modal-card input[type=text]{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;background:var(--surface)}
+.modal-card input[type=number],.modal-card input[type=text],.modal-card input[type=date]{width:100%;border:1.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:14px;background:var(--surface)}
 .modal-card input:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
 .modal-card input[type=number]{font-family:var(--font-mono)}
+.due-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.02em;padding:2px 7px;border-radius:99px;border:1px solid transparent;line-height:1.4}
+.due-future{color:var(--muted);background:var(--bg);border-color:var(--border)}
+.due-soon{color:oklch(48% 0.13 80);background:oklch(95% 0.05 80);border-color:oklch(88% 0.08 80)}
+.due-today{color:oklch(50% 0.18 25);background:oklch(96% 0.03 25);border-color:oklch(90% 0.06 25)}
+.due-over{color:#fff;background:oklch(50% 0.18 25);border-color:oklch(50% 0.18 25)}
 .modal-actions{display:flex;gap:10px;margin-top:6px}
 .modal-actions .btn{flex:1}
 
