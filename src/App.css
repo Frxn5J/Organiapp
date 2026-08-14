@@ -345,7 +345,7 @@ tr.total td{border-top:2px solid var(--border);font-weight:800;background:var(--
 .splash{
   position:fixed;inset:0;z-index:100;
   display:grid;place-items:center;
-  background:var(--surface);
+  background:#faf7fd;
   padding:24px;
   animation:splashIn .45s ease;
 }
