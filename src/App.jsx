@@ -71,22 +71,46 @@ const CURRENCIES = [
 
 function fmtBase(n, cur='€'){ const v=Math.round(n); const f=new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(v); return `${f} ${cur}` }
 function today(){ return new Date().toLocaleDateString('es-ES',{day:'numeric',month:'short'}) }
-function isoToday(){ return new Date().toISOString().slice(0,10) }
 function formatDue(iso){ if(!iso) return ''; try{ return new Date(iso+'T12:00:00').toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) }catch{ return iso } }
+function currentMonthKey(date=new Date()){ return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}` }
+function formatIncomeDate(iso){ try{ return new Date(iso).toLocaleDateString('es-ES',{day:'numeric',month:'short',year:'numeric'}) }catch{ return '' } }
+function formatPeriodKey(key){
+  const [year,month] = String(key||'').split('-').map(Number)
+  if(!year||!month) return 'Sin periodo'
+  return new Date(year,month-1,1).toLocaleDateString('es-ES',{month:'long',year:'numeric'})
+}
+function allocateProportionally(items, budget){
+  const allocations = new Map()
+  const total = items.reduce((sum,item)=>sum+item.amount,0)
+  if(total<=0 || budget<=0) return allocations
+  const ranked = items.filter(item=>item.amount>0).map(item=>{
+    const exact = item.amount*budget/total
+    const amount = Math.floor(exact)
+    allocations.set(item.id, amount)
+    return { ...item, fraction:exact-amount }
+  }).sort((a,b)=>b.fraction-a.fraction)
+  let remainder = budget-[...allocations.values()].reduce((sum,amount)=>sum+amount,0)
+  for(const item of ranked){
+    if(remainder<=0) break
+    if((allocations.get(item.id)||0)<item.amount){ allocations.set(item.id,(allocations.get(item.id)||0)+1); remainder-- }
+  }
+  return allocations
+}
 function daysUntilDue(iso){ if(!iso) return null; const a=new Date(); a.setHours(0,0,0,0); const b=new Date(iso+'T00:00:00'); b.setHours(0,0,0,0); return Math.ceil((b-a)/86400000) }
 function daysInMonth(y,m){ return new Date(y,m+1,0).getDate() }
+function localIsoDate(date){ return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}` }
 function dueIsoFromDay(day){
   const n=new Date(); let y=n.getFullYear(), m=n.getMonth()
   let d=Math.min(day, daysInMonth(y,m))
   let cand=new Date(y,m,d); cand.setHours(0,0,0,0)
   const today0=new Date(y,m,n.getDate()); today0.setHours(0,0,0,0)
   if(cand < today0){ m++; if(m>11){m=0; y++} d=Math.min(day, daysInMonth(y,m)); cand=new Date(y,m,d) }
-  return cand.toISOString().slice(0,10)
+  return localIsoDate(cand)
 }
 function colorOf(id){ return COLORS.find(c=>c.id===id) || COLORS[0] }
 
 function buildFresh(){
-  return { view:'onboarding', freq:'quincenal', ingresoMensual:0, received:0, varIncome:false, varTotal:0, appColor:'teal', colorChosen:false, name:'', onbStep:0, onbMsgs:[], envelopes:[], currency:'€', onbWantsDue:null }
+  return { view:'onboarding', freq:'quincenal', ingresoMensual:0, received:0, varIncome:false, varTotal:0, periodKey:currentMonthKey(), incomeHistory:[], appColor:'teal', colorChosen:false, name:'', onbStep:0, onbMsgs:[], envelopes:[], currency:'€', onbWantsDue:null }
 }
 
 const STORAGE_KEY = 'sobres-app-v2'
@@ -101,6 +125,10 @@ function loadState(){
     if(s.name==null) s.name=''
     if(s.varIncome==null) s.varIncome=false
     if(s.varTotal==null) s.varTotal=0
+    if(!Array.isArray(s.incomeHistory)) s.incomeHistory=[]
+    const month = currentMonthKey()
+    if(s.periodKey==null) s.periodKey=month
+    if(s.periodKey!==month){ s.periodKey=month; s.received=0; s.varTotal=0 }
     if(s.colorChosen==null) s.colorChosen=false
     if(s.onbStep==null) s.onbStep=0
     if(!Array.isArray(s.onbMsgs)) s.onbMsgs=[]
@@ -109,7 +137,11 @@ function loadState(){
       if(e.color==null && LEGACY[e.id]){ e.name=LEGACY[e.id].name; e.icon=LEGACY[e.id].icon; e.color=LEGACY[e.id].c; e.tint=LEGACY[e.id].t }
       if(e.balance==null) e.balance=0
       if(!Array.isArray(e.txns)) e.txns=[]
-      if(e.dueDate===undefined) e.dueDate=null
+      if(e.dueDay==null && e.dueDate){
+        const legacyDue = new Date(e.dueDate+'T12:00:00')
+        if(!Number.isNaN(legacyDue.getTime())) e.dueDay=legacyDue.getDate()
+      }
+      if(e.dueDay===undefined) e.dueDay=null
     }
     return s
   }catch{ return null }
@@ -136,7 +168,7 @@ export default function App(){
   const [catIcon, setCatIcon] = useState('comida')
   const [catColor, setCatColor] = useState('teal')
   const [catMax, setCatMax] = useState('')
-  const [catDueDate, setCatDueDate] = useState('')
+  const [catDueDay, setCatDueDay] = useState('')
   const [varConcept, setVarConcept] = useState('')
   const [confirmDel, setConfirmDel] = useState(null)
   const [obPick, setObPick] = useState({ icon:'comida', color:'teal' })
@@ -151,7 +183,9 @@ export default function App(){
   function save(s){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)) }catch{} }
   function update(patch){
     setState(prev=>{
-      const next = typeof patch==='function' ? patch(prev) : { ...prev, ...patch }
+      const month = currentMonthKey()
+      const base = prev.periodKey===month ? prev : { ...prev, periodKey:month, received:0, varTotal:0 }
+      const next = typeof patch==='function' ? patch(base) : { ...base, ...patch }
       save(next)
       return next
     })
@@ -165,6 +199,22 @@ export default function App(){
     r.setProperty('--accent-strong-hover', col.h)
     r.setProperty('--accent-soft', col.soft)
   }, [state.appColor])
+
+  useEffect(()=>{
+    function resetMonthIfNeeded(){
+      setState(prev=>{
+        const month = currentMonthKey()
+        if(prev.periodKey===month) return prev
+        const next = { ...prev, periodKey:month, received:0, varTotal:0 }
+        save(next)
+        return next
+      })
+    }
+    resetMonthIfNeeded()
+    const timer = setInterval(resetMonthIfNeeded, 60000)
+    document.addEventListener('visibilitychange', resetMonthIfNeeded)
+    return ()=>{ clearInterval(timer); document.removeEventListener('visibilitychange', resetMonthIfNeeded) }
+  }, [])
 
   useEffect(()=>{
     if(state.view==='onboarding' && chatBodyRef.current){
@@ -186,7 +236,7 @@ export default function App(){
   }, [varModal, drawerId, catModal, confirmDel])
 
   function openCatModal(){
-    setCatName(''); setCatIcon('comida'); setCatColor('teal'); setCatMax(''); setCatDueDate(''); setCatModal(true)
+    setCatName(''); setCatIcon('comida'); setCatColor('teal'); setCatMax(''); setCatDueDay(''); setCatModal(true)
   }
   function closeCatModal(){ setCatModal(false) }
   function submitCat(){
@@ -196,22 +246,26 @@ export default function App(){
     if(!(n>0) || !isFinite(n)){ showToast('Escribe un máximo válido'); return }
     const col = colorOf(catColor)
     const id = 'c'+Date.now()
-    update(prev=> ({ ...prev, envelopes:[...prev.envelopes, { id, name, icon:catIcon, color:col.a, tint:col.soft, on:true, max:Math.round(n), balance:0, txns:[], dueDate: catDueDate||null }] }))
+    const dueDay = parseInt(catDueDay,10)
+    if(catDueDay && !(dueDay>=1&&dueDay<=31)){ showToast('El día de pago debe estar entre 1 y 31'); return }
+    update(prev=> ({ ...prev, envelopes:[...prev.envelopes, { id, name, icon:catIcon, color:col.a, tint:col.soft, on:true, max:Math.round(n), balance:0, txns:[], dueDay: dueDay||null }] }))
     closeCatModal()
     showToast('Categoría creada: '+name)
   }
-  function setEnvelopeDueDate(id, iso){
-    update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===id ? {...x, dueDate: iso||null}:x)}))
+  function setEnvelopeDueDay(id, value){
+    const day = parseInt(value,10)
+    update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===id ? {...x, dueDay:(day>=1&&day<=31)?day:null}:x)}))
   }
-  function dueBadgeProps(iso){
-    if(!iso) return null
+  function dueBadgeProps(day){
+    if(!(day>=1&&day<=31)) return null
+    const iso = dueIsoFromDay(day)
     const d = daysUntilDue(iso)
     if(d===null) return null
-    if(d<0) return { label: d===-1 ? 'Venció ayer' : `Venció hace ${Math.abs(d)} días`, tone:'over' }
-    if(d===0) return { label:'Vence hoy', tone:'today' }
-    if(d===1) return { label:'Vence mañana', tone:'soon' }
-    if(d<=7) return { label:`Vence en ${d} días`, tone:'soon' }
-    return { label:`Vence ${formatDue(iso)}`, tone:'future' }
+    if(d<0) return { label: d===-1 ? 'Venció ayer' : `Venció hace ${Math.abs(d)} días`, tone:'over', iso }
+    if(d===0) return { label:'Vence hoy', tone:'today', iso }
+    if(d===1) return { label:'Vence mañana', tone:'soon', iso }
+    if(d<=7) return { label:`Vence en ${d} días`, tone:'soon', iso }
+    return { label:`Vence ${formatDue(iso)}`, tone:'future', iso }
   }
   function deleteEnvelope(id){
     const e = state.envelopes.find(x=>x.id===id)
@@ -252,32 +306,46 @@ export default function App(){
     return Math.min(raw, e.max - e.balance)
   }
   function totalContrib(){ return state.envelopes.filter(e=>e.on).reduce((s,e)=> s+contrib(e),0) }
-  function freePerPay(){ return incomePerPay() - totalContrib() }
   function totalBalance(){ return state.envelopes.filter(e=>e.on).reduce((s,e)=> s+e.balance,0) }
   function envColor(e){ return e.color ? {c:e.color, t:e.tint||e.color} : (LEGACY[e.id]||LEGACY.comida) }
   function envName(e){ return e.name || (LEGACY[e.id]?.name || 'Categoría') }
   function envIconId(e){ return e.icon || (LEGACY[e.id]?.id || 'comida') }
   function getEnv(id){ return state.envelopes.find(e=>e.id===id) || null }
+  function incomePlan(s=state){
+    const payAmount = Math.min(s.ingresoMensual/perMonth(s.freq), Math.max(0,s.ingresoMensual-s.received))
+    const desired = s.envelopes.map(e=>{
+      if(!e.on || e.balance>=e.max) return {id:e.id,amount:0}
+      const raw = Math.round(e.max/perMonth(s.freq))
+      return {id:e.id,amount:Math.max(0,Math.min(raw,e.max-e.balance))}
+    })
+    const desiredTotal = desired.reduce((sum,item)=>sum+item.amount,0)
+    const budget = Math.max(0,Math.floor(Math.min(payAmount,desiredTotal)))
+    const allocations = allocateProportionally(desired,budget)
+    const total = [...allocations.values()].reduce((sum,amount)=>sum+amount,0)
+    return {payAmount,desiredTotal,budget,allocations,total}
+  }
 
   function receiveIncome(){
     if(state.received >= state.ingresoMensual - 0.01){ showToast('Ya recibiste tus pagos de este mes'); return }
     const t = today()
+    const occurredAt = new Date().toISOString()
+    const incomeId = 'income-'+Date.now()
+    const plan = incomePlan(state)
+    const {payAmount,desiredTotal,budget,allocations} = plan
     let total = 0
     let skipped = 0
-    update(prev=>{
-      const envelopes = prev.envelopes.map(e=>{
-        if(!e.on) return e
-        if(e.balance >= e.max){ skipped++; return e }
-        const raw = Math.round(e.max / perMonth(prev.freq))
-        const c = Math.min(raw, e.max - e.balance)
-        if(c<=0){ skipped++; return e }
-        total += c
-        return { ...e, balance: e.balance + c, txns: [{kind:'aporte', amount:c, note:'Aporte de nómina', date:t}, ...e.txns] }
-      })
-      return { ...prev, envelopes, received: Math.min(prev.received + prev.ingresoMensual/perMonth(prev.freq), prev.ingresoMensual) }
+    const envelopes = state.envelopes.map(e=>{
+      if(!e.on) return e
+      if(e.balance>=e.max){ skipped++; return e }
+      const amount = allocations.get(e.id)||0
+      if(amount<=0){ skipped++; return e }
+      total += amount
+      return { ...e, balance:e.balance+amount, txns:[{kind:'aporte',amount,note:'Aporte de nómina',date:t},...e.txns] }
     })
+    const income = { id:incomeId, kind:'nomina', amount:payAmount, distributed:total, concept:'Pago de nómina', occurredAt, periodKey:currentMonthKey() }
+    update({ envelopes, received:Math.min(state.received+payAmount,state.ingresoMensual), incomeHistory:[income,...state.incomeHistory] })
     setPop(true); setTimeout(()=>setPop(false),600)
-    if(total>0) showToast('Ingreso registrado · '+fmt(total)+' repartidos en tus sobres'+(skipped?' · '+skipped+' lleno'+(skipped>1?'s':'')+' omitido'+(skipped>1?'s':''):''))
+    if(total>0) showToast('Ingreso registrado · '+fmt(total)+' repartidos en tus sobres'+(desiredTotal>budget?' · reparto ajustado a tu ingreso':'')+(skipped?' · '+skipped+' omitido'+(skipped>1?'s':''):''))
     else showToast('Todos tus sobres ya están llenos')
   }
 
@@ -287,7 +355,9 @@ export default function App(){
     const n = parseFloat(varAmount)
     if(!(n>0) || !isFinite(n)){ showToast('Escribe un monto válido'); return }
     const amt = Math.round(n*100)/100
-    update(prev=> ({ ...prev, varTotal: (prev.varTotal||0)+amt }))
+    const concept = varConcept.trim() || 'Ingreso variable'
+    const income = { id:'income-'+Date.now(), kind:'variable', amount:amt, distributed:0, concept, occurredAt:new Date().toISOString(), periodKey:currentMonthKey() }
+    update(prev=> ({ ...prev, varTotal:(prev.varTotal||0)+amt, incomeHistory:[income,...prev.incomeHistory] }))
     closeVarModal()
     showToast('Ingreso variable registrado')
   }
@@ -296,6 +366,7 @@ export default function App(){
     if(state.view==='dashboard') return ['Mis sobres','Aparta dinero en cada pago y gasta solo lo que cada sobre tiene disponible.']
     if(state.view==='spending') return ['¿En qué gastas al mes?','La distribución de tu gasto mensual por categoría, según los máximos que configuraste en cada sobre.']
     if(state.view==='calculator') return ['Planificador','Calcula cuánto debes apartar en cada pago para cubrir tus gastos máximos.']
+    if(state.view==='incomeHistory') return ['Historial de ingresos','Consulta tus pagos de nómina e ingresos variables, incluso de meses anteriores.']
     if(state.view==='settings') return ['Ajustes','Tu perfil de ingreso y el tope de cada sobre. Los cambios se guardan en este navegador.']
     return ['','']
   }
@@ -307,9 +378,9 @@ export default function App(){
   function renderDashboard(){
     const paidPays = state.ingresoMensual>0 ? Math.round(state.received/incomePerPay()) : 0
     const totalPays = Math.round(state.ingresoMensual>0 ? state.ingresoMensual/incomePerPay() : 0)
-    const next = totalContrib()
-    const full = state.received >= state.ingresoMensual - 0.01
-    const inc = incomePerPay()
+    const plan = incomePlan()
+    const next = plan.total
+    const inc = plan.payAmount
     const on = state.envelopes.filter(e=>e.on)
 
     return (
@@ -338,18 +409,18 @@ export default function App(){
             {inc>0 ? (
               <>
                 {on.map(e=>{
-                  const ec=envColor(e); const w=(contrib(e)/inc*100)
-                  return <i key={e.id} style={{flexGrow:w.toFixed(1), background:ec.c}} title={`${envName(e)}: ${fmt(contrib(e))} ${freqTxt}`} />
+                  const ec=envColor(e); const amount=plan.allocations.get(e.id)||0; const w=(amount/inc*100)
+                  return amount>0 ? <i key={e.id} style={{flexGrow:w.toFixed(1), background:ec.c}} title={`${envName(e)}: ${fmt(amount)} ${freqTxt}`} /> : null
                 })}
-                {freePerPay()>0 && <i style={{flexGrow:(freePerPay()/inc*100).toFixed(1), background:'oklch(85% 0.01 240)'}} title={`Libre: ${fmt(freePerPay())}`} />}
+                {inc-next>0 && <i style={{flexGrow:((inc-next)/inc*100).toFixed(1), background:'oklch(85% 0.01 240)'}} title={`Libre: ${fmt(inc-next)}`} />}
               </>
             ) : <i style={{flex:1, background:'oklch(88% 0.01 240)'}} title="Añade tu ingreso para ver el reparto" />}
           </div>
           <div className="legend">
             {inc>0 ? (
               <>
-                {on.map(e=>{ const ec=envColor(e); return <span key={e.id} className="lg"><i style={{background:ec.c}} />{envName(e)} <b>{fmt(contrib(e))}</b></span> })}
-                <span className="lg"><i style={{background:'oklch(85% 0.01 240)'}} />Libre <b>{fmt(freePerPay())}</b></span>
+                {on.map(e=>{ const ec=envColor(e); const amount=plan.allocations.get(e.id)||0; return amount>0 ? <span key={e.id} className="lg"><i style={{background:ec.c}} />{envName(e)} <b>{fmt(amount)}</b></span> : null })}
+                <span className="lg"><i style={{background:'oklch(85% 0.01 240)'}} />Libre <b>{fmt(Math.max(0,inc-next))}</b></span>
               </>
             ) : <span className="lg" style={{color:'var(--muted)'}}>Añade tu ingreso en el Planificador para ver el reparto</span>}
           </div>
@@ -360,12 +431,12 @@ export default function App(){
             const ec=envColor(ev)
             const pct = ev.max>0 ? Math.min(100, Math.round(ev.balance/ev.max*100)) : 0
             const full = isFull(ev)
-            const due = dueBadgeProps(ev.dueDate)
+            const due = dueBadgeProps(ev.dueDay)
             return (
               <button key={ev.id} className={`env${full?' full':''}`} data-od-id={`envelope-card-${ev.id}`} onClick={()=>setDrawerId(ev.id)}>
                 <div className="env-top">
                   <span className="env-ico" style={{"--c":ec.c,"--t":ec.t}}><Icon id={envIconId(ev)} /></span>
-                  <div><div className="env-name">{envName(ev)}{full && <span style={{marginLeft:8,fontSize:11,fontWeight:800,color:'var(--ok)',background:'var(--ok-soft)',border:'1px solid oklch(88% 0.06 155)',padding:'2px 7px',borderRadius:99}}>Lleno</span>}{due && <span className={`due-badge due-${due.tone}`}>{due.label}</span>}</div><div className="env-meta">Meta mensual · {fmt(ev.max)}{full?' · lleno':''}{ev.dueDate ? ` · vence ${formatDue(ev.dueDate)}` : ''}</div></div>
+                  <div><div className="env-name">{envName(ev)}{full && <span style={{marginLeft:8,fontSize:11,fontWeight:800,color:'var(--ok)',background:'var(--ok-soft)',border:'1px solid oklch(88% 0.06 155)',padding:'2px 7px',borderRadius:99}}>Lleno</span>}{due && <span className={`due-badge due-${due.tone}`}>{due.label}</span>}</div><div className="env-meta">Meta mensual · {fmt(ev.max)}{full?' · lleno':''}{ev.dueDay ? ` · pago el día ${ev.dueDay} de cada mes` : ''}</div></div>
                   <div className="env-bal mono">{fmt(ev.balance)}</div>
                 </div>
                 <div className="env-bar"><i style={{width:pct+'%', background:ec.c}} /></div>
@@ -486,6 +557,55 @@ export default function App(){
     )
   }
 
+  function renderIncomeHistory(){
+    const history = state.incomeHistory||[]
+    const month = currentMonthKey()
+    const current = history.filter(item=>item.periodKey===month)
+    const currentTotal = current.reduce((sum,item)=>sum+Number(item.amount||0),0)
+    const currentDistributed = current.reduce((sum,item)=>sum+Number(item.distributed||0),0)
+    return (
+      <>
+        <div className="sum-grid">
+          <div className="card sum-card hero">
+            <div className="sum-label">Ingresos de {formatPeriodKey(month)}</div>
+            <div className="sum-val">{fmt(currentTotal)}</div>
+            <div className="sum-sub">{current.length} movimiento{current.length===1?'':'s'} registrado{current.length===1?'':'s'}</div>
+          </div>
+          <div className="card sum-card">
+            <div className="sum-label">Repartido en sobres</div>
+            <div className="sum-val">{fmt(currentDistributed)}</div>
+            <div className="sum-sub">solo aportaciones automáticas de nómina</div>
+          </div>
+          <div className="card sum-card">
+            <div className="sum-label">Historial total</div>
+            <div className="sum-val">{history.length}</div>
+            <div className="sum-sub">ingresos conservados entre meses</div>
+          </div>
+        </div>
+        <div className="card income-history-card">
+          <div className="card-t">Todos los ingresos</div>
+          <div className="card-s">Los contadores mensuales se reinician; este historial no se borra.</div>
+          <div className="income-list">
+            {history.length ? history.map(item=>(
+              <div className="income-row" key={item.id}>
+                <span className={`income-ico ${item.kind==='variable'?'variable':'salary'}`}>
+                  {item.kind==='variable'
+                    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/><circle cx="12" cy="12" r="9"/></svg>
+                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12l7 7 7-7"/></svg>}
+                </span>
+                <div className="income-info">
+                  <div className="income-concept">{item.concept||(item.kind==='variable'?'Ingreso variable':'Pago de nómina')}</div>
+                  <div className="income-meta">{formatIncomeDate(item.occurredAt)} · {formatPeriodKey(item.periodKey)}{item.kind==='nomina' ? ` · ${fmt(item.distributed||0)} repartidos` : ''}</div>
+                </div>
+                <strong className="income-amount">+{fmt(item.amount||0)}</strong>
+              </div>
+            )) : <div className="empty">Aún no hay ingresos registrados. Los nuevos pagos aparecerán aquí.</div>}
+          </div>
+        </div>
+      </>
+    )
+  }
+
   function renderSettings(){
     return (
       <>
@@ -517,15 +637,15 @@ export default function App(){
           <div className="card-s">Marca o desmarca sobres y ajusta el gasto máximo de cada mes.</div>
           <div className="cat-list" style={{marginTop:16,gridTemplateColumns:'1fr'}}>
             {state.envelopes.map(e=>{
-              const ec=envColor(e); const due=dueBadgeProps(e.dueDate)
+              const ec=envColor(e); const due=dueBadgeProps(e.dueDay)
               return (
                 <div key={e.id} className="cat-item" data-od-id={`set-env-${e.id}`} style={{flexWrap:'wrap'}}>
                   <input type="checkbox" checked={!!e.on} onChange={()=> update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===e.id ? {...x, on:!x.on}:x)}))} aria-label={`Activar ${envName(e)}`} />
                   <span className="cat-ico" style={{"--c":ec.c,"--t":ec.t}}><Icon id={envIconId(e)} /></span>
-                  <div className="cat-info"><div className="cat-name">{envName(e)} {due && <span className={`due-badge due-${due.tone}`} style={{marginLeft:6}}>{due.label}</span>}</div><div className="cat-sub">Máximo mensual · {e.balance>0?fmt(e.balance)+' disponible':''}{e.dueDate?` · vence ${formatDue(e.dueDate)}`:''}</div></div>
+                  <div className="cat-info"><div className="cat-name">{envName(e)} {due && <span className={`due-badge due-${due.tone}`} style={{marginLeft:6}}>{due.label}</span>}</div><div className="cat-sub">Máximo mensual · {e.balance>0?fmt(e.balance)+' disponible':''}{e.dueDay?` · pago el día ${e.dueDay} de cada mes`:''}</div></div>
                   <input type="number" min="0" step="any" value={e.max} onChange={ev=>{ const n=parseFloat(ev.target.value); update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===e.id ? {...x, max:(n>0&&isFinite(n))?Math.round(n):0}:x)})) }} aria-label={`Máximo mensual de ${envName(e)}`} />
-                  <input type="date" value={e.dueDate||''} onChange={ev=>setEnvelopeDueDate(e.id, ev.target.value)} aria-label={`Fecha límite de ${envName(e)}`} style={{border:'1px solid var(--border)',borderRadius:8,padding:'8px 10px',fontSize:13,background:'var(--surface)',minHeight:36}} />
-                  {e.dueDate && <button className="btn btn-ghost btn-sm" onClick={()=>setEnvelopeDueDate(e.id,'')} aria-label={`Quitar fecha de ${envName(e)}`} title="Quitar fecha" style={{minHeight:36,padding:'0 10px'}}>×</button>}
+                  <input type="number" min="1" max="31" step="1" value={e.dueDay||''} onChange={ev=>setEnvelopeDueDay(e.id, ev.target.value)} aria-label={`Día de pago mensual de ${envName(e)}`} placeholder="Día" style={{width:76,border:'1px solid var(--border)',borderRadius:8,padding:'8px 10px',fontSize:13,background:'var(--surface)',minHeight:36}} />
+                  {e.dueDay && <button className="btn btn-ghost btn-sm" onClick={()=>setEnvelopeDueDay(e.id,'')} aria-label={`Quitar día de pago de ${envName(e)}`} title="Quitar día" style={{minHeight:36,padding:'0 10px'}}>×</button>}
                   <button className="btn btn-ghost btn-sm" data-od-id={`del-env-${e.id}`} onClick={()=>deleteEnvelope(e.id)} aria-label={`Borrar ${envName(e)}`} title="Borrar sobre" style={{minHeight:36,padding:'0 10px',color:'var(--danger)',borderColor:'transparent'}}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M8 7l1 12h6l1-12"/><path d="M10 11v6M14 11v6"/></svg></button>
                 </div>
               )
@@ -548,7 +668,7 @@ export default function App(){
     const ec=envColor(e)
     const pct = e.max>0 ? Math.min(100, Math.round(e.balance/e.max*100)) : 0
     const full = isFull(e)
-    const due = dueBadgeProps(e.dueDate)
+    const due = dueBadgeProps(e.dueDay)
     const amtNum = parseFloat(miniAmt)
     const hasErr = miniAmt && !(amtNum>0) ? false : (miniMode==='gasto' && amtNum>e.balance)
     const overAporte = miniMode==='aporte' && amtNum>0 && e.balance+Math.round(amtNum) > e.max
@@ -587,16 +707,16 @@ export default function App(){
           <div className="env-bar"><i style={{width:pct+'%', background:ec.c}} /></div>
           <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
             {due ? <span className={`due-badge due-${due.tone}`} style={{fontSize:12}}>{due.label}</span> : <span style={{fontSize:12,color:'var(--muted)'}}>Sin fecha límite</span>}
-            {e.dueDate && <span style={{fontSize:12,color:'var(--muted)'}}>{formatDue(e.dueDate)}</span>}
+            {e.dueDay && <span style={{fontSize:12,color:'var(--muted)'}}>Día {e.dueDay} de cada mes · próximo {due?formatDue(due.iso):''}</span>}
             <span style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
-              <input type="date" value={e.dueDate||''} onChange={ev=>setEnvelopeDueDate(e.id, ev.target.value)} aria-label="Fecha límite" data-od-id="drawer-due-date" style={{border:'1px solid var(--border)',borderRadius:8,padding:'6px 10px',fontSize:13,background:'var(--surface)'}} />
-              {e.dueDate && <button className="btn btn-ghost btn-sm" onClick={()=>setEnvelopeDueDate(e.id,'')} data-od-id="drawer-due-clear" style={{minHeight:32,padding:'0 10px'}}>Quitar</button>}
+              <input type="number" min="1" max="31" step="1" value={e.dueDay||''} onChange={ev=>setEnvelopeDueDay(e.id, ev.target.value)} aria-label="Día de pago mensual" data-od-id="drawer-due-day" placeholder="Día" style={{width:76,border:'1px solid var(--border)',borderRadius:8,padding:'6px 10px',fontSize:13,background:'var(--surface)'}} />
+              {e.dueDay && <button className="btn btn-ghost btn-sm" onClick={()=>setEnvelopeDueDay(e.id,'')} data-od-id="drawer-due-clear" style={{minHeight:32,padding:'0 10px'}}>Quitar</button>}
             </span>
           </div>
-          {e.dueDate && remaining(e)>0 && due && due.tone!=='over' && (
+          {e.dueDay && remaining(e)>0 && due && due.tone!=='over' && (
             <div style={{fontSize:12,color:'var(--muted)'}}>Te faltan <b style={{color:'var(--fg)'}}>{fmt(remaining(e))}</b> para llenarlo{due.tone!=='future' ? ` · ${due.label.toLowerCase()}` : ''}</div>
           )}
-          {e.dueDate && due?.tone==='over' && remaining(e)>0 && (
+          {e.dueDay && due?.tone==='over' && remaining(e)>0 && (
             <div style={{fontSize:12,color:'var(--danger)',fontWeight:700}}>Venció y aún faltan {fmt(remaining(e))}</div>
           )}
           <div className="d-actions">
@@ -659,7 +779,7 @@ export default function App(){
         else if(state.onbWantsDue===false) t.push(<div key="u-due-ask-no" className="msg user"><div className="bub">No, después</div></div>)
         if(state.onbWantsDue===true){
           for(const e of state.envelopes){
-            if(e.dueDate) t.push(<div key={`u-due-${e.id}`} className="msg user"><div className="bub"><b>{envName(e)}</b> · vence el <b>{new Date(e.dueDate+'T12:00:00').getDate()}</b> de cada mes</div></div>)
+            if(e.dueDay) t.push(<div key={`u-due-${e.id}`} className="msg user"><div className="bub"><b>{envName(e)}</b> · vence el <b>día {e.dueDay}</b> de cada mes</div></div>)
           }
         }
       }
@@ -708,15 +828,16 @@ export default function App(){
                   <div className="cf-pick"><span className="pv" style={{display:'grid',placeItems:'center',width:44,height:44,borderRadius:12,background:'var(--accent-soft)',color:'var(--accent-strong)'}}><Icon id={obPick.icon} /></span><select defaultValue={obPick.icon} onChange={e=>setObPick(p=>({...p, icon:e.target.value}))} aria-label="Icono">{iconOpts}</select></div>
                   <div className="cf-pick"><span className="pv sw" style={{"--c":colorOf(obPick.color).a, width:44,height:44,borderRadius:12,display:'grid',placeItems:'center',background:'var(--c)',color:'var(--surface)'}}></span><select defaultValue={obPick.color} onChange={e=>setObPick(p=>({...p, color:e.target.value}))} aria-label="Color">{colorOpts}</select></div>
                   <div className="cf-max"><label>Máximo al mes</label><input type="number" id="cfMax" min="0" step="any" defaultValue={200} inputMode="decimal" /></div>
-                  <div className="field" style={{marginTop:6}}><label style={{fontSize:13,color:'var(--muted)'}}>Fecha límite (opcional)</label><input type="date" id="cfDue" min={isoToday()} style={{width:'100%',border:'1.5px solid var(--border)',borderRadius:10,padding:'10px 12px',fontSize:14,background:'var(--surface)'}} /></div>
+                  <div className="field" style={{marginTop:6}}><label style={{fontSize:13,color:'var(--muted)'}}>Día de pago mensual (opcional)</label><input type="number" id="cfDueDay" min="1" max="31" step="1" inputMode="numeric" placeholder="1–31" style={{width:'100%',border:'1.5px solid var(--border)',borderRadius:10,padding:'10px 12px',fontSize:14,background:'var(--surface)'}} /></div>
                   <div className="cf-add">
                     <button className="btn btn-primary" data-od-id="onb-add-cat" onClick={()=>{
-                      const nameEl=document.getElementById('cfName'); const maxEl=document.getElementById('cfMax'); const dueEl=document.getElementById('cfDue')
-                      const name=nameEl? nameEl.value.trim():''; const max=parseFloat(maxEl?maxEl.value:''); const due=dueEl? dueEl.value:''
+                      const nameEl=document.getElementById('cfName'); const maxEl=document.getElementById('cfMax'); const dueEl=document.getElementById('cfDueDay')
+                      const name=nameEl? nameEl.value.trim():''; const max=parseFloat(maxEl?maxEl.value:''); const dueDay=parseInt(dueEl?dueEl.value:'',10)
                       if(!name){showToast('Escribe un nombre para la categoría');return}
                       if(!(max>0)||!isFinite(max)){showToast('Escribe un monto máximo válido');return}
+                      if(dueEl?.value && !(dueDay>=1&&dueDay<=31)){showToast('El día de pago debe estar entre 1 y 31');return}
                       const col=colorOf(obPick.color)
-                      update(prev=>({ ...prev, envelopes:[...prev.envelopes, { id:'c'+Date.now(), name, icon:obPick.icon, color:col.a, tint:col.soft, on:true, max:Math.round(max), balance:0, txns:[], dueDate: due||null }] }))
+                      update(prev=>({ ...prev, envelopes:[...prev.envelopes, { id:'c'+Date.now(), name, icon:obPick.icon, color:col.a, tint:col.soft, on:true, max:Math.round(max), balance:0, txns:[], dueDay:dueDay||null }] }))
                       if(nameEl) nameEl.value=''; if(maxEl) maxEl.value='200'; if(dueEl) dueEl.value=''
                     }}>Añadir categoría</button>
                     {state.envelopes.length>0 && <button className="btn btn-ghost" data-od-id="onb-done-cats" onClick={()=>{ if(!state.envelopes.length){showToast('Añade al menos una categoría');return} update({onbStep:5, onbWantsDue:null}); setObDueIdx(0); setObDueDay('') }}>Listo</button>}
@@ -739,8 +860,8 @@ export default function App(){
           }
           if(state.onbWantsDue===true){
             const env = state.envelopes[obDueIdx]
-            if(!env) return <><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¡Listo! Ya tienen fecha {state.envelopes.filter(x=>x.dueDate).length} de {state.envelopes.length} sobres.</div></div><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub"><div className="tool"><button className="btn btn-primary" data-od-id="onb-due-done" onClick={()=>update({onbStep:6})}>Continuar</button></div></div></div></>
-            const ec = envColor(env); const done = state.envelopes.filter(x=>x.dueDate).length
+            if(!env) return <><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">¡Listo! Ya tienen día de pago {state.envelopes.filter(x=>x.dueDay).length} de {state.envelopes.length} sobres.</div></div><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub"><div className="tool"><button className="btn btn-primary" data-od-id="onb-due-done" onClick={()=>update({onbStep:6})}>Continuar</button></div></div></div></>
+            const ec = envColor(env); const done = state.envelopes.filter(x=>x.dueDay).length
             return <><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">Sobre <b>{envName(env)}</b> ({obDueIdx+1}/{state.envelopes.length}) · ya tienen fecha {done}/{state.envelopes.length}. <b>¿Qué día del mes se paga?</b></div></div><div className="msg bot"><div className="av">{OB_AV}</div><div className="bub">
               <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                 <span className="cat-ico" style={{"--c":ec.c,"--t":ec.t}}><Icon id={envIconId(env)} /></span><span style={{fontWeight:800}}>{envName(env)}</span>
@@ -753,14 +874,13 @@ export default function App(){
               </div>
               <div className="tool" style={{marginTop:12,display:'flex',gap:8}}>
                 <button className="btn btn-ghost" data-od-id="onb-due-skip" onClick={()=>{
-                  update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===env.id ? {...x, dueDate: null}:x)}))
+                  update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===env.id ? {...x, dueDay:null}:x)}))
                   if(obDueIdx+1 < state.envelopes.length){ setObDueIdx(i=>i+1); setObDueDay('') } else { update({onbStep:6}) }
                 }}>Omitir</button>
                 <button className="btn btn-primary" data-od-id="onb-due-save" onClick={()=>{
-                  if(!obDueDay){ update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===env.id ? {...x, dueDate: null}:x)})); if(obDueIdx+1 < state.envelopes.length){ setObDueIdx(i=>i+1); setObDueDay('') } else update({onbStep:6}); return }
+                  if(!obDueDay){ update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===env.id ? {...x, dueDay:null}:x)})); if(obDueIdx+1 < state.envelopes.length){ setObDueIdx(i=>i+1); setObDueDay('') } else update({onbStep:6}); return }
                   const day=parseInt(obDueDay,10); if(!(day>=1&&day<=31)){showToast('Elige un día del 1 al 31');return}
-                  const iso=dueIsoFromDay(day)
-                  update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===env.id ? {...x, dueDate: iso}:x)}))
+                  update(prev=>({ ...prev, envelopes: prev.envelopes.map(x=> x.id===env.id ? {...x, dueDay:day}:x)}))
                   if(obDueIdx+1 < state.envelopes.length){ setObDueIdx(i=>i+1); setObDueDay('') } else update({onbStep:6})
                 }}>Guardar y continuar</button>
               </div>
@@ -850,6 +970,7 @@ export default function App(){
         {state.view==='dashboard' && <section className="view" data-od-id="dashboard">{renderDashboard()}</section>}
         {state.view==='spending' && <section className="view" data-od-id="spending">{renderSpending()}</section>}
         {state.view==='calculator' && <section className="view" data-od-id="calculator">{renderCalculator()}</section>}
+        {state.view==='incomeHistory' && <section className="view" data-od-id="income-history">{renderIncomeHistory()}</section>}
         {state.view==='settings' && <section className="view" data-od-id="settings">{renderSettings()}</section>}
         {state.view==='onboarding' && <section className="view" data-od-id="onboarding">{renderOnboarding()}</section>}
       </main>
@@ -864,6 +985,9 @@ export default function App(){
           </a>
           <a href="#" data-nav="calculator" data-od-id="nav-calculator" className={state.view==='calculator'?'active':''} onClick={e=>{e.preventDefault(); go('calculator')}}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h8"/></svg><span>Planificador</span>
+          </a>
+          <a href="#" data-nav="income-history" data-od-id="nav-income-history" className={state.view==='incomeHistory'?'active':''} onClick={e=>{e.preventDefault(); go('incomeHistory')}}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5v14h16"/><path d="M7 14l4-4 3 3 5-6"/></svg><span>Ingresos</span>
           </a>
           <a href="#" data-nav="settings" data-od-id="nav-settings" className={state.view==='settings'?'active':''} onClick={e=>{e.preventDefault(); go('settings')}}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Ajustes</span>
@@ -909,7 +1033,7 @@ export default function App(){
               </div>
             </div>
             <div className="field"><label>Máximo mensual ({state.currency})</label><input type="number" value={catMax} onChange={e=>setCatMax(e.target.value)} min="0" step="any" inputMode="decimal" placeholder="200" /></div>
-            <div className="field"><label>Fecha límite (opcional)</label><input type="date" value={catDueDate} onChange={e=>setCatDueDate(e.target.value)} /></div>
+            <div className="field"><label>Día de pago mensual (opcional)</label><input type="number" min="1" max="31" step="1" inputMode="numeric" placeholder="1–31" value={catDueDay} onChange={e=>setCatDueDay(e.target.value)} /></div>
             <div className="modal-actions">
               <button className="btn btn-ghost" onClick={closeCatModal}>Cancelar</button>
               <button className="btn btn-primary" data-od-id="cta-category-confirm" onClick={submitCat}>Crear</button>
